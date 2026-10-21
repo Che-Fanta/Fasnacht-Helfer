@@ -429,6 +429,7 @@
     const hatVerf = document.querySelectorAll("[data-verf]:checked").length > 0;
     if (!auswahl.size && !hatVerf) { st.className = "error"; st.textContent = "Bitte oben mindestens einen Einsatz anhaken (oder unten ankreuzen, wann du sonst helfen könntest)."; return; }
     if (!vorname || !name || !tel) { st.className = "error"; st.textContent = "Bitte Vorname, Name und Telefon ausfüllen."; return; }
+    if (!vereinWert("vereinBox")) { st.className = "error"; st.textContent = "Bitte Verein / Gruppe wählen (oder «Keine»)."; return; }
     $("btnSenden").disabled = true;
     st.className = "muted"; st.textContent = "Wird gespeichert…";
     try {

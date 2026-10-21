@@ -425,7 +425,7 @@
       const liste = [...auswahl].map(sid => { const s = schichten.find(x => x.id === sid); return `${tagLabel(s.tag)}: ${s.bereich} – ${s.aufgabe} (${s.zeit})`; });
       auswahl.clear();
       ["fVorname", "fName", "fTel", "fMail", "fVerein", "fBemerkung"].forEach(i => $(i).value = "");
-      document.querySelectorAll("[data-verf]").forEach(c => c.checked = false);
+      document.querySelectorAll("[data-verf], [data-verein]").forEach(c => c.checked = false);
       await ladeEintraege();
       renderHelferSchichten();
       st.className = "ok";

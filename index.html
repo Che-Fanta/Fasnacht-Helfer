@@ -177,6 +177,22 @@
   </div>
 </div>
 
+<!-- OK: neue Person erfassen (gleiche Pflichtfelder wie Anmeldung) -->
+<dialog id="neuDialog" style="border:none; border-radius:6px; box-shadow:0 0 12px rgba(0,0,0,0.3); max-width:440px; width:92%;">
+  <h2>Neue Person einteilen</h2>
+  <p class="muted" id="neuEinsatz"></p>
+  <label>Vorname *<input id="nhVorname"/></label>
+  <label>Name *<input id="nhName"/></label>
+  <label>Telefon (Handy) *<input id="nhTel" type="tel"/></label>
+  <label>E-Mail (optional)<input id="nhMail" type="email"/></label>
+  <p style="margin:1rem 0 0.3rem; font-size:0.9rem; font-weight:bold; color:#444;">Verein / Gruppe * (mehrere möglich)</p>
+  <div id="nhVereinBox" class="vereinBox"></div>
+  <label>Bemerkung (optional)<textarea id="nhBemerkung" rows="2"></textarea></label>
+  <p id="nhStatus" class="error"></p>
+  <button id="nhSpeichern">Speichern &amp; einteilen</button>
+  <button id="nhAbbrechen" class="secondary">Abbrechen</button>
+</dialog>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";

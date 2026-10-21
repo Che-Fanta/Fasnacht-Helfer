@@ -1,9 +1,12 @@
 rules_version = '2';
 // In Firebase Console → Firestore → Regeln einfügen und "Veröffentlichen".
-// Helfer (ohne Login): Einsätze lesen, sich eintragen. OK (Login): alles.
+// Helfer: anonymes Geräte-Login (Authentication → Anonym aktivieren).
+//   Einsätze lesen, sich eintragen, eigene unbestätigte Einsätze abmelden.
+// OK: Login mit E-Mail/Passwort → alles.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function istOK() { return request.auth != null; }
+    function angemeldet() { return request.auth != null; }
+    function istOK() { return angemeldet() && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
     // Anmeldung global offen UND Einsatz nicht auf "nur OK" gestellt
     function anmeldungErlaubt(jahrCol, sid) {
       let cfg = get(/databases/$(database)/documents/$(jahrCol)/config).data;
@@ -16,18 +19,26 @@ service cloud.firestore {
       allow read: if col.matches('Fasnacht_[0-9]+');
       allow write: if istOK() && col.matches('Fasnacht_[0-9]+');
     }
-    // Einteilungen: Namen sind öffentlich sichtbar, Helfer dürfen nur neue "angemeldet"-Einträge anlegen
+    // Einteilungen: öffentlich lesbar
     match /{col}/{id} {
       allow read: if col.matches('Fasnacht_[0-9]+_eintraege');
       allow create: if col.matches('Fasnacht_[0-9]+_eintraege')
-        && request.resource.data.keys().hasOnly(['schichtId', 'helferId', 'name', 'status', 'erstellt'])
-        && (istOK() || (request.resource.data.status == 'angemeldet'
+        && request.resource.data.keys().hasOnly(['schichtId', 'helferId', 'name', 'status', 'uid', 'erstellt'])
+        && (istOK() || (angemeldet()
+            && request.resource.data.status == 'angemeldet'
+            && request.resource.data.uid == request.auth.uid
+            // Helfer-Datensatz muss demselben Gerät gehören (auch im selben Batch neu angelegt)
+            && getAfter(/databases/$(database)/documents/$(col.replace('_eintraege', '_helfer'))/$(request.resource.data.helferId)).data.uid == request.auth.uid
             && anmeldungErlaubt(col.replace('_eintraege', ''), request.resource.data.schichtId)));
-      allow update, delete: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');
+      allow update: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');
+      // Helfer dürfen eigene, noch nicht bestätigte Einsätze abmelden
+      allow delete: if col.matches('Fasnacht_[0-9]+_eintraege')
+        && (istOK() || (angemeldet() && resource.data.get('uid', '') == request.auth.uid && resource.data.status == 'angemeldet'));
     }
-    // Kontaktdaten: Helfer dürfen nur anlegen, lesen nur das OK
+    // Kontaktdaten: Helfer dürfen nur anlegen (mit eigener uid), lesen nur das OK
     match /{col}/{id} {
-      allow create: if col.matches('Fasnacht_[0-9]+_helfer');
+      allow create: if col.matches('Fasnacht_[0-9]+_helfer')
+        && (istOK() || (angemeldet() && request.resource.data.uid == request.auth.uid));
       allow read, update, delete: if istOK() && col.matches('Fasnacht_[0-9]+_helfer');
     }
   }

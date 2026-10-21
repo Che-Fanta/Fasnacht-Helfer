@@ -22,7 +22,12 @@
   .error { color: var(--rot); }
   .ok { color: var(--gruen); }
   .flex-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
-  label { display: block; margin-top: 0.6rem; font-size: 0.9rem; }
+  label { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.8rem; font-size: 0.9rem; font-weight: bold; color: #444; }
+  label:has(input[type=checkbox]) { flex-direction: row; align-items: center; font-weight: normal; }
+  #formBox input, #formBox textarea { max-width: 420px; border: 1px solid #bbb; border-radius: 4px; }
+  #formBox .verf { margin-top: 0.3rem; }
+  #formBox .verf th, #formBox .verf td { padding: 0.3rem 0.6rem; }
+  #btnSenden { margin-top: 0.8rem; }
   input, select, textarea { padding: 0.4rem; font-size: 1rem; width: 100%; max-width: 340px; box-sizing: border-box; }
   input[type=checkbox] { width: auto; }
   details { margin-bottom: 0.6rem; border: 1px solid var(--blau); border-radius: 5px; background: white; }
@@ -87,7 +92,7 @@
     <label>Telefon (Handy) *<input id="fTel" type="tel" autocomplete="tel"/></label>
     <label>E-Mail (optional)<input id="fMail" type="email" autocomplete="email"/></label>
     <label>Verein / Gruppe (optional)<input id="fVerein"/></label>
-    <label>Ergänzend zu meinen Einsätzen könnte ich auch an folgenden Tagen helfen (optional):</label>
+    <p style="margin:1rem 0 0; font-size:0.9rem; font-weight:bold; color:#444;">Ergänzend zu meinen Einsätzen könnte ich auch an folgenden Tagen helfen (optional):</p>
     <table class="verf" style="max-width:420px;">
       <tr><th></th><th>Vormittag</th><th>Nachmittag</th></tr>
       <tbody id="verfRows"></tbody>

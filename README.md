@@ -10,7 +10,7 @@ Live über GitHub Pages; Daten in Firebase Firestore. Alles in `index.html`.
 1. console.firebase.google.com → Projekt hinzufügen (z.B. `fasnacht-ek`), Analytics aus.
 2. Build → Firestore Database → Datenbank erstellen (Standort `eur3`/Zürich, Produktionsmodus).
 3. Firestore → Regeln: Inhalt von `firestore.rules` einfügen → Veröffentlichen.
-4. Build → Authentication → Sign-in method → **E-Mail/Passwort** aktivieren.
+4. Sicherheit → Authentication → Jetzt starten → Anmeldemethode → **E-Mail/Passwort** aktivieren.
    Unter "Users" für jedes OK-Mitglied einen Benutzer anlegen.
 5. Projekteinstellungen → Web-App hinzufügen → `firebaseConfig` in `index.html` einsetzen.
 6. Authentication → Settings → Autorisierte Domains: `che-fanta.github.io` hinzufügen.

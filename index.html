@@ -224,7 +224,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   // ====================================================================
   // >>> FIREBASE-PROJEKT <<<  (Firebase Console → Projekteinstellungen → Web-App)
@@ -412,7 +412,7 @@
   async function oeffneHelfer() {
     zeigeView("helferView");
     $("helferSchichten").textContent = "Lade Einsätze…";
-    await Promise.all([ladeConfig(), ladeEintraege(), auth.authStateReady()]);
+    await Promise.all([ladeConfig(), ladeEintraege()]);
     renderHelferSchichten();
   }
 
@@ -452,21 +452,15 @@
   }
   $("btnZumFormular").addEventListener("click", () => ich ? einsaetzeDazunehmen() : $("formBox").scrollIntoView({ behavior: "smooth" }));
 
-  // ---- "Ich" auf diesem Gerät: anonymes Firebase-Login + gemerkte helferId ----
-  // Nur über dieses Login darf ein Helfer seine eigenen, noch unbestätigten Einsätze abmelden.
+  // ---- "Ich" auf diesem Gerät: gemerkte helferId, damit "Meine Einsätze" ohne Suchen erscheint ----
   const ICH_KEY = `fasnacht_${JAHR}_ich`;
-  let ich = null;   // { helferId, uid, vorname, name }
+  let ich = null;   // { helferId, vorname, name }
   try { ich = JSON.parse(localStorage.getItem(ICH_KEY) || "null"); } catch { ich = null; }
   function speichereIch(v) {
     ich = v;
     try { v ? localStorage.setItem(ICH_KEY, JSON.stringify(v)) : localStorage.removeItem(ICH_KEY); } catch {}
   }
-  async function geraeteLogin() {
-    if (auth.currentUser) return auth.currentUser;
-    return (await signInAnonymously(auth)).user;
-  }
-  // "Ich" gilt nur, wenn dasselbe anonyme Login noch aktiv ist
-  const ichAktiv = () => !!(ich && auth.currentUser && auth.currentUser.uid === ich.uid);
+  const ichAktiv = () => !!ich;
 
   function renderMeine() {
     if (!ichAktiv()) { $("meineBox").style.display = "none"; $("formBox").style.display = anmeldungOffen && schichten.length ? "block" : "none"; return; }
@@ -483,18 +477,22 @@
         ${e.status !== "bestaetigt" ? `<button class="small danger" data-abmelden="${e.id}">Abmelden</button>` : ""}
       </div>`).join("")
       : "<p class='muted'>Du hast im Moment keine Einsätze. Wähle unten einen aus.</p>";
-    $("meineListe").querySelectorAll("[data-abmelden]").forEach(b => b.addEventListener("click", async () => {
+    bindeAbmelden($("meineListe"));
+  }
+  // Abmelden von noch nicht bestätigten Einsätzen (Meine Einsätze + Suche)
+  function bindeAbmelden(box, danach) {
+    box.querySelectorAll("[data-abmelden]").forEach(b => b.addEventListener("click", async () => {
       if (!confirm("Von diesem Einsatz abmelden?")) return;
       b.disabled = true;
       try {
         await deleteDoc(doc(db, COL_EINTRAEGE, b.dataset.abmelden));
-        await ladeEintraege();
-        renderHelferSchichten();
       } catch (err) {
         console.error(err);
         alert("Abmelden nicht möglich – evtl. wurde der Einsatz in der Zwischenzeit vom OK bestätigt.");
-        await ladeEintraege(); renderHelferSchichten();
       }
+      await ladeEintraege();
+      renderHelferSchichten();
+      if (danach) danach();
     }));
   }
   $("btnNichtIch").addEventListener("click", () => { speichereIch(null); renderHelferSchichten(); $("formBox").scrollIntoView({ behavior: "smooth" }); });
@@ -512,7 +510,7 @@
       if (!(await pruefeFrei())) { renderHelferSchichten(); alert("Ein Einsatz wurde in der Zwischenzeit voll. Bitte Auswahl prüfen."); return; }
       const batch = writeBatch(db);
       [...auswahl].forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
-        { schichtId: sid, helferId: ich.helferId, name: `${ich.vorname} ${ich.name}`, status: "angemeldet", uid: ich.uid, erstellt: serverTimestamp() }));
+        { schichtId: sid, helferId: ich.helferId, name: `${ich.vorname} ${ich.name}`, status: "angemeldet", erstellt: serverTimestamp() }));
       await batch.commit();
       auswahl.clear();
       await ladeEintraege();
@@ -542,18 +540,17 @@
         return;
       }
       const verfuegbar = [...document.querySelectorAll("[data-verf]:checked")].map(c => c.dataset.verf);
-      const user = await geraeteLogin();
       const batch = writeBatch(db);
       const hRef = doc(collection(db, COL_HELFER));
       batch.set(hRef, { vorname, name, tel, mail: $("fMail").value.trim(), verein: vereinWert("vereinBox"),
-        verfuegbar, bemerkung: $("fBemerkung").value.trim(), erstellt: serverTimestamp(), uid: user.uid,
+        verfuegbar, bemerkung: $("fBemerkung").value.trim(), erstellt: serverTimestamp(),
         // Ursprüngliche Anmeldung als Text festhalten (bleibt, auch wenn das OK später umteilt)
         angemeldetFuer: [...auswahl].map(sid => einsatzText(schichten.find(x => x.id === sid))) });
       [...auswahl].forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
-        { schichtId: sid, helferId: hRef.id, name: `${vorname} ${name}`, status: "angemeldet", uid: user.uid, erstellt: serverTimestamp() }));
+        { schichtId: sid, helferId: hRef.id, name: `${vorname} ${name}`, status: "angemeldet", erstellt: serverTimestamp() }));
       await batch.commit();
-      // Nur bei echtem Helfer-Login merken (nicht, wenn ein OK-Mitglied das Formular nutzt)
-      if (user.isAnonymous) speichereIch({ helferId: hRef.id, uid: user.uid, vorname, name });
+      // Auf diesem Gerät merken (nicht, wenn ein OK-Mitglied das Formular nutzt)
+      if (!istAdmin) speichereIch({ helferId: hRef.id, vorname, name });
       const liste = [...auswahl].map(sid => { const s = schichten.find(x => x.id === sid); return `${tagLabel(s.tag)}: ${s.bereich} – ${s.aufgabe} (${s.zeit})`; });
       auswahl.clear();
       ["fVorname", "fName", "fTel", "fMail", "fBemerkung"].forEach(i => $(i).value = "");
@@ -562,7 +559,7 @@
       renderHelferSchichten();
       st.className = "ok";
       st.innerHTML = liste.length
-        ? `<strong>Merci vielmal, ${esc(vorname)}!</strong> Deine Anmeldung für folgende Einsätze ist eingegangen:<ul>${liste.map(l => `<li>${esc(l)}</li>`).join("")}</ul>Oben unter «Meine Einsätze» siehst du den Status. Solange das OK nicht bestätigt hat, kannst du dich dort selbst abmelden oder weitere Einsätze dazunehmen (auf diesem Gerät).`
+        ? `<strong>Merci vielmal, ${esc(vorname)}!</strong> Deine Anmeldung für folgende Einsätze ist eingegangen:<ul>${liste.map(l => `<li>${esc(l)}</li>`).join("")}</ul>Oben unter «Meine Einsätze» siehst du den Status. Solange das OK nicht bestätigt hat, kannst du dich dort selbst abmelden oder weitere Einsätze dazunehmen – oder jederzeit über «Einsätze nachschauen» mit deinem Namen.`
         : `<strong>Merci vielmal, ${esc(vorname)}!</strong> Das OK meldet sich bei dir für einen Einsatz.`;
     } catch (err) {
       console.error(err);
@@ -600,7 +597,7 @@
 
   let istAdmin = false;
   async function onAdmin(authUser) {
-    const user = authUser && !authUser.isAnonymous ? authUser : null;   // anonymes Helfer-Login ist kein OK
+    const user = authUser;
     istAdmin = !!user;
     $("adminLoginBox").style.display = user ? "none" : "block";
     $("adminContent").style.display = user ? "block" : "none";

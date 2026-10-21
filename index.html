@@ -602,16 +602,41 @@
       const h = helfer[sel.value];
       neuerEintrag(sel.dataset.sid, sel.value, `${h.vorname} ${h.name}`);
     }));
-    box.querySelectorAll("[data-act=addneu]").forEach(b => b.addEventListener("click", async () => {
-      const vn = prompt("Vorname:"); if (!vn) return;
-      const nn = prompt("Name:") || "";
-      const tel = prompt("Telefon (optional):") || "";
+    box.querySelectorAll("[data-act=addneu]").forEach(b => b.addEventListener("click", () => oeffneNeuDialog(b.dataset.sid)));
+  }
+
+  let neuSchichtId = null;
+  function oeffneNeuDialog(sid) {
+    neuSchichtId = sid;
+    const s = schichten.find(x => x.id === sid);
+    $("neuEinsatz").textContent = `${tagLabel(s.tag)} · ${s.bereich} – ${s.aufgabe} (${s.zeit})`;
+    ["nhVorname", "nhName", "nhTel", "nhMail", "nhBemerkung"].forEach(i => $(i).value = "");
+    $("nhVereinBox").querySelectorAll("[data-verein]").forEach(c => c.checked = false);
+    $("nhStatus").textContent = "";
+    $("neuDialog").showModal();
+  }
+  $("nhAbbrechen").addEventListener("click", () => $("neuDialog").close());
+  $("nhSpeichern").addEventListener("click", async () => {
+    const h = { vorname: $("nhVorname").value.trim(), name: $("nhName").value.trim(), tel: $("nhTel").value.trim(),
+      mail: $("nhMail").value.trim(), verein: vereinWert("nhVereinBox"), verfuegbar: [],
+      bemerkung: $("nhBemerkung").value.trim() || "durch OK erfasst", erstellt: serverTimestamp() };
+    if (!h.vorname || !h.name || !h.tel) { $("nhStatus").textContent = "Bitte Vorname, Name und Telefon ausfüllen."; return; }
+    if (!h.verein) { $("nhStatus").textContent = "Bitte Verein / Gruppe wählen (oder «Keine»)."; return; }
+    $("nhSpeichern").disabled = true;
+    try {
       const hRef = doc(collection(db, COL_HELFER));
-      const h = { vorname: vn.trim(), name: nn.trim(), tel: tel.trim(), mail: "", verein: "", verfuegbar: [], bemerkung: "durch OK erfasst", erstellt: serverTimestamp() };
       await setDoc(hRef, h);
       helfer[hRef.id] = h;
-      neuerEintrag(b.dataset.sid, hRef.id, `${h.vorname} ${h.name}`.trim());
-    }));
+      $("neuDialog").close();
+      await neuerEintrag(neuSchichtId, hRef.id, `${h.vorname} ${h.name}`);
+    } catch (err) {
+      console.error(err);
+      $("nhStatus").textContent = "Speichern fehlgeschlagen.";
+    } finally {
+      $("nhSpeichern").disabled = false;
+    }
+  });
+  {
   }
   function helferOptionen(sid) {
     const schon = new Set(eintraegeVon(sid).map(e => e.helferId));

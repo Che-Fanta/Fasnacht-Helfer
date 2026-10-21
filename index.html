@@ -404,7 +404,7 @@
             <input type="checkbox" data-sid="${s.id}" ${auswahl.has(s.id) ? "checked" : ""} ${voll || nurOK || !anmeldungOffen ? "disabled" : ""}/>
             <div class="info"><strong>${esc(s.aufgabe)}</strong>
               <div class="zeit">🕒 ${esc(s.zeit)} · Verantwortlich: ${esc(s.verantwortlich)}${s.hinweis ? " · " + esc(s.hinweis) : ""}</div>
-              ${e.length ? `<div class="namen">👥 ${e.map(x => esc(x.name)).join(", ")}</div>` : ""}
+              ${e.some(x => x.status === "bestaetigt") ? `<div class="namen">👥 ${e.filter(x => x.status === "bestaetigt").map(x => esc(x.name)).join(", ")}</div>` : ""}
             </div>
             ${nurOK && !voll ? `<span class="badge" style="background:#6c757d;">Einteilung durch OK</span>`
               : `<span class="badge ${ampel(e.length, s.bedarf)}">${voll ? "voll" : `${s.bedarf - e.length} frei`}</span>`}

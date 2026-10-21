@@ -689,7 +689,89 @@
     }).sort((a, b) => `${a.name} ${a.vorname}`.localeCompare(`${b.name} ${b.vorname}`));
   }
   const verfText = v => (v || []).map(x => { const [t, z] = x.split("_"); return `${tagLabel(t).split(" ")[0].slice(0, 2)} ${z === "V" ? "Vorm." : "Nachm."}`; }).join(", ");
-  const einsatzText = s => `${tagLabel(s.tag).split(" ")[0].slice(0, 2)} ${s.bereich}: ${s.aufgabe} (${s.zeit})`;
+  // ---- Stunden & Dashboard ----
+  function schaetzeStunden(zeit) {
+    const z = String(zeit || "");
+    const t = [...z.matchAll(/(\d{1,2})[:.](\d{2})/g)].map(m => Number(m[1]) + Number(m[2]) / 60);
+    let ende = /schluss/i.test(z) ? 26 : null;              // "Schluss" = 02:00 Uhr
+    if (t.length >= 2 && ende === null) ende = t[t.length - 1];
+    const start = t.length ? (/hallenübergabe/i.test(z) && t.length > 2 ? t[1] : t[0]) : null;
+    if (start !== null && ende !== null) { let d = ende - start; if (d <= 0) d += 24; return Math.round(d * 2) / 2; }
+    if (/fertig/i.test(z)) return 8;
+    return 4;                                                // Vormittag, Nachmittag, "ab 17:00" usw.
+  }
+  const stundenVon = s => (typeof s.stunden === "number" && s.stunden >= 0) ? s.stunden : schaetzeStunden(s.zeit);
+  const vereineVon = h => String(h?.verein || "").split(",").map(v => v.trim()).filter(Boolean);
+  const fmtH = n => (Math.round(n * 10) / 10).toLocaleString("de-CH");
+
+  function dashboardDaten(nurBest) {
+    const proVerein = {};
+    const add = (v, k, n) => { proVerein[v] = proVerein[v] || { helfer: 0, einsaetze: 0, stunden: 0 }; proVerein[v][k] += n; };
+    Object.values(helfer).forEach(h => { const vs = vereineVon(h); (vs.length ? vs : ["(ohne Angabe)"]).forEach(v => add(v, "helfer", 1)); });
+    eintraege.filter(e => !nurBest || e.status === "bestaetigt").forEach(e => {
+      const s = schichten.find(x => x.id === e.schichtId); if (!s) return;
+      const vs = vereineVon(helfer[e.helferId]); const liste = vs.length ? vs : ["(ohne Angabe)"];
+      liste.forEach(v => { add(v, "einsaetze", 1 / liste.length); add(v, "stunden", stundenVon(s) / liste.length); });
+    });
+    return proVerein;
+  }
+
+  function balken(wert, max, farbe) {
+    const p = max ? Math.round(wert / max * 100) : 0;
+    return `<div style="background:#eee;border-radius:3px;height:12px;min-width:80px;"><div style="width:${p}%;background:${farbe};height:12px;border-radius:3px;"></div></div>`;
+  }
+
+  function renderDashboard() {
+    const nurBest = $("dashNurBest").checked;
+    const zaehlt = e => !nurBest || e.status === "bestaetigt";
+    const bedarfH = schichten.reduce((n, s) => n + s.bedarf * stundenVon(s), 0);
+    const besetztH = eintraege.filter(zaehlt).reduce((n, e) => { const s = schichten.find(x => x.id === e.schichtId); return n + (s ? stundenVon(s) : 0); }, 0);
+    const pv = dashboardDaten(nurBest);
+    const vereine = Object.entries(pv).sort((a, b) => b[1].stunden - a[1].stunden);
+    const maxH = Math.max(0, ...vereine.map(([, d]) => d.stunden));
+
+    const bereiche = [...new Set(schichten.map(s => s.bereich))].map(b => {
+      const sch = schichten.filter(s => s.bereich === b);
+      const bed = sch.reduce((n, s) => n + Number(s.bedarf), 0);
+      const bes = sch.reduce((n, s) => n + Math.min(eintraegeVon(s.id).filter(zaehlt).length, s.bedarf), 0);
+      const h = sch.reduce((n, s) => n + eintraegeVon(s.id).filter(zaehlt).length * stundenVon(s), 0);
+      return { b, bed, bes, h };
+    });
+    const tage = TAGE.map(t => {
+      const sch = schichten.filter(s => s.tag === t.id);
+      const bed = sch.reduce((n, s) => n + Number(s.bedarf), 0);
+      const bes = sch.reduce((n, s) => n + Math.min(eintraegeVon(s.id).filter(zaehlt).length, s.bedarf), 0);
+      return { t, bed, bes };
+    }).filter(x => x.bed);
+
+    $("adminDashboard").innerHTML = `
+      <div class="kpis">
+        <div class="kpi"><span class="muted">Stunden geleistet</span><strong>${fmtH(besetztH)} h</strong></div>
+        <div class="kpi"><span class="muted">Stunden benötigt</span><strong>${fmtH(bedarfH)} h</strong></div>
+        <div class="kpi"><span class="muted">Abdeckung</span><strong>${bedarfH ? Math.round(besetztH / bedarfH * 100) : 0} %</strong></div>
+        <div class="kpi"><span class="muted">Helfer</span><strong>${Object.keys(helfer).length}</strong></div>
+        <div class="kpi"><span class="muted">Ø Std. pro Helfer</span><strong>${Object.keys(helfer).length ? fmtH(besetztH / Object.keys(helfer).length) : 0} h</strong></div>
+      </div>
+      <h3>Pro Verein / Gruppe</h3>
+      <table><tr><th>Verein</th><th>Helfer</th><th>Einsätze</th><th>Stunden</th><th style="width:30%;">Anteil Stunden</th></tr>
+        ${vereine.map(([v, d]) => `<tr><td>${esc(v)}</td><td>${d.helfer}</td><td>${fmtH(d.einsaetze)}</td><td><strong>${fmtH(d.stunden)} h</strong></td>
+          <td>${balken(d.stunden, maxH, "var(--blau)")} <span class="muted">${besetztH ? Math.round(d.stunden / besetztH * 100) : 0} %</span></td></tr>`).join("")
+          || "<tr><td colspan='5' class='muted'>Noch keine Daten.</td></tr>"}
+      </table>
+      <h3>Pro Bereich</h3>
+      <table><tr><th>Bereich</th><th>Besetzt / Bedarf</th><th>Stunden</th><th style="width:30%;">Abdeckung</th></tr>
+        ${bereiche.map(x => `<tr><td>${esc(x.b)}</td><td>${x.bes} / ${x.bed}</td><td>${fmtH(x.h)} h</td>
+          <td>${balken(x.bes, x.bed, x.bes >= x.bed ? "var(--gruen)" : "var(--gelb)")}</td></tr>`).join("")}
+      </table>
+      <h3>Pro Tag</h3>
+      <table><tr><th>Tag</th><th>Besetzt / Bedarf</th><th style="width:30%;">Abdeckung</th></tr>
+        ${tage.map(x => `<tr><td>${esc(x.t.label)}</td><td>${x.bes} / ${x.bed}</td>
+          <td>${balken(x.bes, x.bed, x.bes >= x.bed ? "var(--gruen)" : "var(--gelb)")}</td></tr>`).join("")}
+      </table>`;
+  }
+  $("dashNurBest").addEventListener("change", renderDashboard);
+
+  const einsatzText = s =>`${tagLabel(s.tag).split(" ")[0].slice(0, 2)} ${s.bereich}: ${s.aufgabe} (${s.zeit})`;
 
   const zeitpunkt = ts => ts?.toDate ? ts.toDate().toLocaleString("de-CH", { dateStyle: "short", timeStyle: "short" }) : "";
   function renderAnmeldungen() {

@@ -1,0 +1,27 @@
+rules_version = '2';
+// In Firebase Console → Firestore → Regeln einfügen und "Veröffentlichen".
+// Helfer (ohne Login): Einsätze lesen, sich eintragen. OK (Login): alles.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function istOK() { return request.auth != null; }
+
+    // Einsätze + Einstellungen
+    match /{col}/config {
+      allow read: if col.matches('Fasnacht_[0-9]+');
+      allow write: if istOK() && col.matches('Fasnacht_[0-9]+');
+    }
+    // Einteilungen: Namen sind öffentlich sichtbar, Helfer dürfen nur neue "angemeldet"-Einträge anlegen
+    match /{col}/{id} {
+      allow read: if col.matches('Fasnacht_[0-9]+_eintraege');
+      allow create: if col.matches('Fasnacht_[0-9]+_eintraege')
+        && request.resource.data.keys().hasOnly(['schichtId', 'helferId', 'name', 'status', 'erstellt'])
+        && (request.resource.data.status == 'angemeldet' || istOK());
+      allow update, delete: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');
+    }
+    // Kontaktdaten: Helfer dürfen nur anlegen, lesen nur das OK
+    match /{col}/{id} {
+      allow create: if col.matches('Fasnacht_[0-9]+_helfer');
+      allow read, update, delete: if istOK() && col.matches('Fasnacht_[0-9]+_helfer');
+    }
+  }
+}

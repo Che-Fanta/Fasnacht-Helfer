@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Fasnacht Helfer</title>
+<style>
+  :root { --rot:#b02a37; --gelb:#d39e00; --gruen:#198754; --blau:#6f2da8; --blau-dunkel:#4b1d73; }
+  body { font-family: sans-serif; padding: 1rem; background: #f8f6fb; color: #333; max-width: 1100px; margin: 0 auto; }
+  #startView, #helferView, #adminView { display: none; }
+  h1 { color: var(--blau-dunkel); margin-bottom: 0.2rem; }
+  h2 { color: var(--blau-dunkel); margin-top: 0; }
+  h3 { color: var(--blau-dunkel); margin: 1rem 0 0.4rem; }
+  button { background: var(--gruen); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; margin: 0.1rem; font-size: 0.95rem; }
+  button.secondary { background: #6c757d; }
+  button.danger { background: var(--rot); }
+  button.small { padding: 0.15rem 0.45rem; font-size: 0.8rem; }
+  button:disabled { background: #ccc; cursor: default; }
+  .big { font-size: 1.1rem; padding: 0.8rem 1.2rem; }
+  .box { background: white; padding: 1rem; border-radius: 6px; margin-top: 1rem; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
+  .muted { color: #666; font-size: 0.85rem; }
+  .error { color: var(--rot); }
+  .ok { color: var(--gruen); }
+  .flex-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+  label { display: block; margin-top: 0.6rem; font-size: 0.9rem; }
+  input, select, textarea { padding: 0.4rem; font-size: 1rem; width: 100%; max-width: 340px; box-sizing: border-box; }
+  input[type=checkbox] { width: auto; }
+  details { margin-bottom: 0.6rem; border: 1px solid var(--blau); border-radius: 5px; background: white; }
+  summary { font-weight: bold; padding: 0.5rem; cursor: pointer; background: var(--blau); color: white; }
+  details > div { padding: 0.5rem; }
+  .schicht { border-bottom: 1px solid #eee; padding: 0.5rem 0.2rem; display: flex; gap: 0.6rem; align-items: flex-start; }
+  .schicht:last-child { border-bottom: none; }
+  .schicht .info { flex: 1; }
+  .schicht .zeit { color: #555; font-size: 0.85rem; }
+  .namen { font-size: 0.85rem; color: #444; margin-top: 0.2rem; }
+  .badge { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.8rem; font-weight: bold; color: white; white-space: nowrap; }
+  .b-rot { background: var(--rot); } .b-gelb { background: var(--gelb); } .b-gruen { background: var(--gruen); }
+  .kpis { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+  .kpi { background: white; border-radius: 6px; padding: 0.6rem 1rem; box-shadow: 0 0 5px rgba(0,0,0,0.1); min-width: 120px; }
+  .kpi strong { display: block; font-size: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; background: white; }
+  th, td { border: 1px solid #ddd; padding: 0.35rem; text-align: left; font-size: 0.88rem; vertical-align: top; }
+  th { background: #efe8f6; }
+  .tabs button { background: #ddd; color: #333; }
+  .tabs button.active { background: var(--blau); color: white; }
+  .person { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; padding: 0.2rem 0; border-top: 1px dashed #eee; flex-wrap: wrap; }
+  .person .neu { color: var(--gelb); font-weight: bold; font-size: 0.75rem; }
+  .verf td { text-align: center; }
+  #sticky { position: sticky; bottom: 0; background: white; padding: 0.7rem; box-shadow: 0 -2px 6px rgba(0,0,0,0.15); border-radius: 6px 6px 0 0; display: none; }
+  @media print {
+    button, .tabs, #adminLoginBox, .noprint { display: none !important; }
+    body { background: white; }
+    .box { box-shadow: none; padding: 0; }
+    details { border: none; } summary { background: none; color: black; }
+  }
+</style>
+</head>
+<body>
+<h1>🎭 Fasnacht Ebnat-Kappel</h1>
+<p class="muted" id="jahrHinweis"></p>
+<p class="error" id="globalError"></p>
+
+<!-- Start -->
+<div id="startView">
+  <div class="box">
+    <h2>Willkommen!</h2>
+    <p>Schön, dass du an der Fasnacht mithilfst. Wähle die Einsätze, die dir passen, und trag dich ein – ganz ohne Login.</p>
+    <button id="btnHelfer" class="big">Ich will helfen – Einsätze ansehen</button>
+  </div>
+  <p style="margin-top:2rem;"><button id="btnAdmin" class="secondary small">OK-Login</button></p>
+</div>
+
+<!-- Helfer -->
+<div id="helferView">
+  <button class="secondary small btnBack">← Startseite</button>
+  <div class="box" id="infoBox"></div>
+  <div class="box">
+    <h2>1. Einsätze auswählen</h2>
+    <p class="muted">Hake alle Einsätze an, die du übernehmen möchtest. Das OK prüft die Anmeldungen und teilt definitiv ein.</p>
+    <p id="anmeldungZu" class="error" style="display:none;">Die Anmeldung ist zurzeit geschlossen. Bitte melde dich direkt beim OK.</p>
+    <div id="helferSchichten">Lade Einsätze…</div>
+  </div>
+  <div class="box" id="formBox">
+    <h2>2. Deine Angaben</h2>
+    <label>Vorname *<input id="fVorname" autocomplete="given-name"/></label>
+    <label>Name *<input id="fName" autocomplete="family-name"/></label>
+    <label>Telefon (Handy) *<input id="fTel" type="tel" autocomplete="tel"/></label>
+    <label>E-Mail (optional)<input id="fMail" type="email" autocomplete="email"/></label>
+    <label>Verein / Gruppe (optional)<input id="fVerein"/></label>
+    <label>Ergänzend zu meinen Einsätzen könnte ich auch an folgenden Tagen helfen (optional):</label>
+    <table class="verf" style="max-width:420px;">
+      <tr><th></th><th>Vormittag</th><th>Nachmittag</th></tr>
+      <tbody id="verfRows"></tbody>
+    </table>
+    <label>Bemerkung (optional)<textarea id="fBemerkung" rows="2"></textarea></label>
+    <p class="muted">Deine Telefonnummer sieht nur das OK. Auf der Liste erscheint dein Name.</p>
+    <button id="btnSenden" class="big">Anmeldung absenden</button>
+    <p id="formStatus"></p>
+  </div>
+  <div class="box">
+    <h2>Meine Einsätze</h2>
+    <p class="muted">Gib deinen Vor- und Nachnamen ein, um deine Einsätze zu sehen.</p>
+    <input id="suchName" placeholder="z.B. Anna Muster"/> <button id="btnSuchen" class="secondary">Suchen</button>
+    <div id="suchResultat"></div>
+  </div>
+  <div id="sticky"><span id="stickyText"></span> <button id="btnZumFormular">Weiter zu meinen Angaben ↓</button></div>
+</div>
+
+<!-- Admin -->
+<div id="adminView">
+  <div class="flex-row noprint">
+    <button class="secondary small btnBack">← Startseite</button>
+    <button id="btnLogoutAdmin" class="secondary small" style="display:none;">Logout</button>
+  </div>
+  <div class="box" id="adminLoginBox">
+    <h2>OK-Login</h2>
+    <label>E-Mail<input id="adminMail" type="email" autocomplete="username"/></label>
+    <label>Passwort<input id="adminPass" type="password" autocomplete="current-password"/></label>
+    <button id="btnAdminLogin">Login</button>
+    <p class="error" id="adminError"></p>
+  </div>
+
+  <div id="adminContent" style="display:none;">
+    <div class="kpis" id="kpis" style="margin-top:1rem;"></div>
+    <div class="tabs noprint" style="margin-top:1rem;">
+      <button data-tab="uebersicht" class="active">Übersicht &amp; Einteilung</button>
+      <button data-tab="helfer">Helferliste</button>
+      <button data-tab="schichten">Einsätze verwalten</button>
+    </div>
+
+    <div class="box tab" id="tab-uebersicht">
+      <div class="flex-row noprint">
+        <div>
+          Filter: <select id="filterTag" style="width:auto;"></select>
+          <select id="filterBereich" style="width:auto;"></select>
+          <label style="display:inline;"><input type="checkbox" id="filterOffen"/> nur nicht voll</label>
+        </div>
+        <div><button id="btnDrucken" class="secondary small">Drucken / PDF</button></div>
+      </div>
+      <p class="muted noprint">🟡 neu = selbst angemeldet, noch nicht bestätigt. Mit <strong>✓</strong> bestätigen, mit <strong>⇄</strong> in einen anderen Einsatz verschieben.</p>
+      <div id="adminUebersicht"></div>
+    </div>
+
+    <div class="box tab" id="tab-helfer" style="display:none;">
+      <div class="flex-row">
+        <h2>Alle Helfer</h2>
+        <button id="btnCsv" class="secondary small">Export CSV (Excel)</button>
+      </div>
+      <div id="adminHelfer" style="overflow-x:auto;"></div>
+    </div>
+
+    <div class="box tab" id="tab-schichten" style="display:none;">
+      <h2>Einstellungen</h2>
+      <label><input type="checkbox" id="anmeldungOffen"/> Anmeldung für Helfer offen</label>
+      <h2 style="margin-top:1.2rem;">Einsätze</h2>
+      <p class="muted">Bedarf = benötigte Anzahl Helfer. Löschen geht nur, wenn niemand eingeteilt ist.</p>
+      <div id="importBox"></div>
+      <div id="adminSchichten" style="overflow-x:auto;"></div>
+      <h3>Neuer Einsatz</h3>
+      <div class="flex-row" style="justify-content:flex-start;">
+        <select id="nTag" style="width:auto;"></select>
+        <input id="nBereich" placeholder="Bereich, z.B. Bar" style="width:150px;"/>
+        <input id="nAufgabe" placeholder="Aufgabe" style="width:170px;"/>
+        <input id="nZeit" placeholder="Zeit, z.B. 19:30–23:30" style="width:160px;"/>
+        <input id="nBedarf" type="number" min="1" value="2" style="width:70px;"/>
+        <input id="nVerantw" placeholder="Verantwortlich" style="width:150px;"/>
+        <button id="btnNeuSchicht">Hinzufügen</button>
+      </div>
+      <p id="schichtStatus" class="ok"></p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+  // ====================================================================
+  // >>> FIREBASE-PROJEKT <<<  (Firebase Console → Projekteinstellungen → Web-App)
+  // ====================================================================
+  const firebaseConfig = {
+    apiKey: "HIER_EINTRAGEN",
+    authDomain: "HIER_EINTRAGEN.firebaseapp.com",
+    projectId: "HIER_EINTRAGEN",
+    storageBucket: "HIER_EINTRAGEN.appspot.com",
+    messagingSenderId: "",
+    appId: ""
+  };
+
+  // ====================================================================
+  // >>> JAHR-NAMESPACE <<<
+  // Für ein neues Jahr: JAHR anpassen (z.B. "2028") und unten TAGE + VORLAGE aktualisieren.
+  //   Fasnacht_<JAHR>/config        -> { schichten: {id: {...}}, anmeldungOffen }   (öffentlich lesbar)
+  //   Fasnacht_<JAHR>_eintraege/*   -> { schichtId, helferId, name, status }        (öffentlich lesbar)
+  //   Fasnacht_<JAHR>_helfer/*      -> { vorname, name, tel, mail, verein, ... }    (nur OK)
+  // ====================================================================
+  const JAHR = "2027";
+  const COL_CONFIG = `Fasnacht_${JAHR}`;
+  const COL_EINTRAEGE = `Fasnacht_${JAHR}_eintraege`;
+  const COL_HELFER = `Fasnacht_${JAHR}_helfer`;
+
+  const TAGE = [
+    { id: "mi", label: "Mittwoch 03.02.2027" },
+    { id: "do", label: "Donnerstag 04.02.2027" },
+    { id: "fr", label: "Freitag 05.02.2027" },
+    { id: "sa", label: "Samstag 06.02.2027" },
+    { id: "so", label: "Sonntag 07.02.2027" },
+  ];
+  // Tage für "zusätzlich verfügbar" (wie Blatt "Helfer" im Excel)
+  const VERF_TAGE = ["fr", "sa", "so"];
+
+  const INFOS = [
+    ["Tenue", "Es wäre toll, wenn alle Helfer verkleidet arbeiten würden. Danke."],
+    ["Treffpunkt", "Der Treffpunkt ist jeweils für alle beim jeweiligen Einteilungsort."],
+    ["Abwesenheit", "Bist du verhindert, dann organisier bitte deinen Ersatz selber. Herzlichen Dank!"],
+    ["Bar", "Bitte einen eigenen Gurt für die Portemonnaies mitbringen."],
+    ["Eingangsbereich", "Bitte etwas wärmer anziehen, da die Türe immer wieder geöffnet ist."],
+    ["Verpflegung (Grill, Fritteuse)", "Bitte warm anziehen, ihr arbeitet draussen im beheizten Zelt."],
+  ];
+
+  // Vorlage aus "Helferliste Fasnacht 2026 Schluss.xls" (Bedarf geschätzt, im Admin anpassbar)
+  // [tag, bereich, aufgabe, zeit, bedarf, verantwortlich, hinweis]
+  const VORLAGE = [
+    ["mi","Auf- und Abbau","Aufstellen Bühne (Beihilfe Roger Amacker)","08:00 Hallenübergabe, 09:00–ca. 19:00",4,"Adi H. und Roger",""],
+    ["mi","Auf- und Abbau","Schwarze Tücher anheften (Beihilfe)","ab 17:00",4,"Adi H. und Roger",""],
+    ["mi","Auf- und Abbau","Aufbau Bar","ab 18:00",4,"Adi H. und Roger",""],
+    ["do","Auf- und Abbau","Deko","08:00 bis fertig",6,"Meli und Bettina","OK Fasnacht"],
+    ["do","Auf- und Abbau","Bau","08:00–18:00",4,"Adi H.",""],
+    ["do","Auf- und Abbau","Aufbau Boden und Zelt (Küche)","08:00–18:00",4,"Adi H.",""],
+    ["fr","Eingangsbereich","Kasse – 1. Schicht","18:45–23:30",2,"Dario",""],
+    ["fr","Eingangsbereich","Garderobe – 1. Schicht","18:45–23:30",2,"Dario",""],
+    ["fr","Eingangsbereich","Kasse – 2. Schicht","23:00–Schluss",2,"Dario",""],
+    ["fr","Eingangsbereich","Garderobe – 2. Schicht","23:00–Schluss",2,"Dario",""],
+    ["fr","Bar","Bar (Mitte) – 1. Schicht","19:30–23:30",3,"Manu / Bettina","teilweise bis 24:00"],
+    ["fr","Bar","Bar (Wand) – 1. Schicht","19:30–23:30",3,"Manu / Bettina",""],
+    ["fr","Bar","Nachschub / Springer – 1. Schicht","19:30–23:30",2,"Manu / Bettina",""],
+    ["fr","Bar","Bar (Mitte) – 2. Schicht","23:00–Schluss",3,"Manu / Bettina",""],
+    ["fr","Bar","Bar (Wand) – 2. Schicht","23:00–Schluss",3,"Manu / Bettina",""],
+    ["fr","Bar","Nachschub / Springer – 2. Schicht","23:00–Schluss",2,"Manu / Bettina",""],
+    ["fr","Verpflegung","Fritteuse / Grill – 1. Schicht","19:30–23:00",3,"Adi / Fabienne / Eliane",""],
+    ["fr","Verpflegung","Kasse Verpflegung – 1. Schicht","19:30–23:00",1,"Adi / Fabienne / Eliane",""],
+    ["fr","Verpflegung","Fritteuse / Grill – 2. Schicht","22:30–Schluss",3,"Adi / Fabienne / Eliane",""],
+    ["fr","Verpflegung","Kasse Verpflegung – 2. Schicht","22:30–Schluss",1,"Adi / Fabienne / Eliane",""],
+    ["fr","Kaffeestube","Buffet – 1. Schicht","19:30–23:30",2,"Manu / Bettina / Eliane",""],
+    ["fr","Kaffeestube","Service – 1. Schicht","19:30–23:30",3,"Manu / Bettina / Eliane",""],
+    ["fr","Kaffeestube","Buffet – 2. Schicht","23:00–Schluss",2,"Manu / Bettina / Eliane",""],
+    ["fr","Kaffeestube","Service – 2. Schicht","23:00–Schluss",3,"Manu / Bettina / Eliane",""],
+    ["fr","Auf- und Abbau","WC-Tour","20:00–Schluss, stündlich",2,"Adi H.",""],
+    ["sa","Auf- und Abbau","Reinigung WC","Vormittag",2,"Adi H.",""],
+    ["sa","Auf- und Abbau","Beihilfe Reinigung Halle","Vormittag",4,"Adi H.",""],
+    ["sa","Umzug","Umzug Auf- und Abbrechen","10:00, Treffpunkt Turnhalle",6,"Andi / Adam",""],
+    ["sa","Umzug","Infostand und Fassstrasse","12:30, Treffpunkt Turnhalle",4,"Adam",""],
+    ["sa","Umzug","Getränkestand Metzger (Getränke und Grill)","12:30, Treffpunkt Turnhalle",3,"Andi / Adam",""],
+    ["sa","Umzug","Lutzexpress","13:00, Treffpunkt Turnhalle",3,"Andi / Adam",""],
+    ["sa","Umzug","Speaker","Umzug",1,"Roger",""],
+    ["sa","Familienfasnacht","Familienfasnacht","Nachmittag",4,"Meli und Bettina","Aline Bleiker (FaKo)"],
+    ["sa","Bar","Bar (Mitte) – 1. Schicht","14:00–19:30",3,"Manu / Bettina","Rahel Rust (Verantwortung Beginn)"],
+    ["sa","Bar","Nachschub / Springer – 1. Schicht","14:00–19:30",2,"Manu / Bettina",""],
+    ["sa","Bar","Bar (Mitte) – 2. Schicht","19:00–22:30",3,"Manu / Bettina",""],
+    ["sa","Bar","Nachschub / Springer – 2. Schicht","19:00–22:30",2,"Manu / Bettina",""],
+    ["sa","Verpflegung","Fritteuse / Grill – 1. Schicht","14:45–18:30",3,"Adi / Fabienne / Eliane",""],
+    ["sa","Verpflegung","Kasse Verpflegung – 1. Schicht","14:45–18:30",1,"Adi / Fabienne / Eliane",""],
+    ["sa","Verpflegung","Fritteuse / Grill – 2. Schicht","18:30–22:00",3,"Adi / Fabienne / Eliane",""],
+    ["sa","Verpflegung","Kasse Verpflegung – 2. Schicht","18:30–22:00",1,"Adi / Fabienne / Eliane",""],
+    ["sa","Kaffeestube","Buffet – 1. Schicht","14:00–18:30",2,"Manu / Bettina / Eliane",""],
+    ["sa","Kaffeestube","Service – 1. Schicht","14:00–18:30",3,"Manu / Bettina / Eliane",""],
+    ["sa","Kaffeestube","Buffet – 2. Schicht","18:00–22:30",2,"Manu / Bettina / Eliane",""],
+    ["sa","Kaffeestube","Service – 2. Schicht","18:00–22:30",3,"Manu / Bettina / Eliane",""],
+    ["sa","Auf- und Abbau","WC-Tour","16:00–Schluss, stündlich",2,"Adi H.",""],
+    ["so","Auf- und Abbau","Aufräumen Bar","Vormittag",3,"Adi H.",""],
+    ["so","Auf- und Abbau","Reinigung Aussenanlage","Vormittag",3,"Adi H.",""],
+    ["so","Auf- und Abbau","Aufräumen Halle","Vormittag",6,"Adi H.",""],
+  ];
+
+  const konfiguriert = !firebaseConfig.apiKey.includes("HIER_EINTRAGEN");
+  const app = konfiguriert ? initializeApp(firebaseConfig) : null;
+  const db = app ? getFirestore(app) : null;
+  const auth = app ? getAuth(app) : null;
+  const configRef = db ? doc(db, COL_CONFIG, "config") : null;
+
+  let schichten = [];       // [{id, tag, bereich, aufgabe, zeit, bedarf, verantwortlich, hinweis, sort}]
+  let anmeldungOffen = true;
+  let eintraege = [];       // [{id, schichtId, helferId, name, status}]
+  let helfer = {};          // helferId -> {...}   (nur Admin)
+  const auswahl = new Set();
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  const tagLabel = t => (TAGE.find(x => x.id === t) || { label: t }).label;
+  const tagIndex = t => TAGE.findIndex(x => x.id === t);
+  const norm = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+  $("jahrHinweis").textContent = `Helfer-Einsätze Fasnacht ${JAHR}`;
+
+  function zeigeView(id) {
+    ["startView", "helferView", "adminView"].forEach(v => $(v).style.display = v === id ? "block" : "none");
+    $("sticky").style.display = "none";
+    window.scrollTo(0, 0);
+  }
+
+  // ---- Daten laden ----
+  async function ladeConfig() {
+    const snap = await getDoc(configRef);
+    const data = snap.exists() ? snap.data() : {};
+    schichten = Object.entries(data.schichten || {}).map(([id, v]) => ({ id, ...v }))
+      .sort((a, b) => tagIndex(a.tag) - tagIndex(b.tag) || (a.sort ?? 0) - (b.sort ?? 0));
+    anmeldungOffen = data.anmeldungOffen !== false;
+  }
+  async function ladeEintraege() {
+    const snap = await getDocs(collection(db, COL_EINTRAEGE));
+    eintraege = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
+  async function ladeHelfer() {
+    const snap = await getDocs(collection(db, COL_HELFER));
+    helfer = {};
+    snap.docs.forEach(d => helfer[d.id] = d.data());
+  }
+  const eintraegeVon = sid => eintraege.filter(e => e.schichtId === sid);
+  function ampel(belegt, bedarf) {
+    if (belegt >= bedarf) return "b-gruen";
+    return belegt === 0 ? "b-rot" : "b-gelb";
+  }
+  // Gruppiert nach Tag -> Bereich
+  function gruppiert(liste) {
+    const g = [];
+    TAGE.forEach(t => {
+      const tagSch = liste.filter(s => s.tag === t.id);
+      if (!tagSch.length) return;
+      const bereiche = [...new Set(tagSch.map(s => s.bereich))];
+      g.push({ tag: t, bereiche: bereiche.map(b => ({ name: b, schichten: tagSch.filter(s => s.bereich === b) })) });
+    });
+    return g;
+  }
+
+  // ====================================================================
+  // HELFER-ANSICHT
+  // ====================================================================
+  $("infoBox").innerHTML = "<h2>Wichtige Informationen</h2>" +
+    INFOS.map(([t, x]) => `<p><strong>${esc(t)}:</strong> ${esc(x)}</p>`).join("") +
+    "<p>Wir bedanken uns herzlich und freuen uns riesig auf euch!</p>";
+  $("verfRows").innerHTML = VERF_TAGE.map(t =>
+    `<tr><td style="text-align:left;">${esc(tagLabel(t))}</td>
+     <td><input type="checkbox" data-verf="${t}_V"/></td><td><input type="checkbox" data-verf="${t}_N"/></td></tr>`).join("");
+
+  async function oeffneHelfer() {
+    zeigeView("helferView");
+    $("helferSchichten").textContent = "Lade Einsätze…";
+    await Promise.all([ladeConfig(), ladeEintraege()]);
+    renderHelferSchichten();
+  }
+
+  function renderHelferSchichten() {
+    $("anmeldungZu").style.display = anmeldungOffen ? "none" : "block";
+    $("formBox").style.display = anmeldungOffen ? "block" : "none";
+    if (!schichten.length) { $("helferSchichten").innerHTML = "<p class='muted'>Noch keine Einsätze erfasst.</p>"; return; }
+    $("helferSchichten").innerHTML = gruppiert(schichten).map(g => {
+      const offen = g.bereiche.reduce((n, b) => n + b.schichten.filter(s => eintraegeVon(s.id).length < s.bedarf).length, 0);
+      return `<details open><summary>${esc(g.tag.label)} <span style="font-weight:normal;">– ${offen} Einsätze mit freien Plätzen</span></summary><div>` +
+        g.bereiche.map(b => `<h3>${esc(b.name)}</h3>` + b.schichten.map(s => {
+          const e = eintraegeVon(s.id);
+          const voll = e.length >= s.bedarf;
+          return `<div class="schicht">
+            <input type="checkbox" data-sid="${s.id}" ${auswahl.has(s.id) ? "checked" : ""} ${voll || !anmeldungOffen ? "disabled" : ""}/>
+            <div class="info"><strong>${esc(s.aufgabe)}</strong>
+              <div class="zeit">🕒 ${esc(s.zeit)} · Verantwortlich: ${esc(s.verantwortlich)}${s.hinweis ? " · " + esc(s.hinweis) : ""}</div>
+              ${e.length ? `<div class="namen">👥 ${e.map(x => esc(x.name)).join(", ")}</div>` : ""}
+            </div>
+            <span class="badge ${ampel(e.length, s.bedarf)}">${voll ? "voll" : `${s.bedarf - e.length} frei`}</span>
+          </div>`;
+        }).join("")).join("") + "</div></details>";
+    }).join("");
+    document.querySelectorAll("#helferSchichten input[data-sid]").forEach(cb => cb.addEventListener("change", () => {
+      cb.checked ? auswahl.add(cb.dataset.sid) : auswahl.delete(cb.dataset.sid);
+      updateSticky();
+    }));
+    updateSticky();
+  }
+  function updateSticky() {
+    $("sticky").style.display = auswahl.size ? "block" : "none";
+    $("stickyText").textContent = `${auswahl.size} Einsatz${auswahl.size === 1 ? "" : "e"} ausgewählt`;
+  }
+  $("btnZumFormular").addEventListener("click", () => $("formBox").scrollIntoView({ behavior: "smooth" }));
+
+  $("btnSenden").addEventListener("click", async () => {
+    const st = $("formStatus");
+    const vorname = $("fVorname").value.trim(), name = $("fName").value.trim(), tel = $("fTel").value.trim();
+    if (!auswahl.size) { st.className = "error"; st.textContent = "Bitte oben mindestens einen Einsatz anhaken."; return; }
+    if (!vorname || !name || !tel) { st.className = "error"; st.textContent = "Bitte Vorname, Name und Telefon ausfüllen."; return; }
+    $("btnSenden").disabled = true;
+    st.className = "muted"; st.textContent = "Wird gespeichert…";
+    try {
+      await ladeEintraege();
+      const vollJetzt = [...auswahl].filter(sid => { const s = schichten.find(x => x.id === sid); return !s || eintraegeVon(sid).length >= s.bedarf; });
+      if (vollJetzt.length) {
+        vollJetzt.forEach(sid => auswahl.delete(sid));
+        renderHelferSchichten();
+        st.className = "error"; st.textContent = "Ein Einsatz wurde in der Zwischenzeit voll. Bitte Auswahl prüfen und nochmals absenden.";
+        return;
+      }
+      const verfuegbar = [...document.querySelectorAll("[data-verf]:checked")].map(c => c.dataset.verf);
+      const batch = writeBatch(db);
+      const hRef = doc(collection(db, COL_HELFER));
+      batch.set(hRef, { vorname, name, tel, mail: $("fMail").value.trim(), verein: $("fVerein").value.trim(),
+        verfuegbar, bemerkung: $("fBemerkung").value.trim(), erstellt: serverTimestamp() });
+      [...auswahl].forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
+        { schichtId: sid, helferId: hRef.id, name: `${vorname} ${name}`, status: "angemeldet", erstellt: serverTimestamp() }));
+      await batch.commit();
+      const liste = [...auswahl].map(sid => { const s = schichten.find(x => x.id === sid); return `${tagLabel(s.tag)}: ${s.bereich} – ${s.aufgabe} (${s.zeit})`; });
+      auswahl.clear();
+      ["fVorname", "fName", "fTel", "fMail", "fVerein", "fBemerkung"].forEach(i => $(i).value = "");
+      document.querySelectorAll("[data-verf]").forEach(c => c.checked = false);
+      await ladeEintraege();
+      renderHelferSchichten();
+      st.className = "ok";
+      st.innerHTML = `<strong>Merci vielmal, ${esc(vorname)}!</strong> Du bist eingetragen für:<ul>${liste.map(l => `<li>${esc(l)}</li>`).join("")}</ul>Das OK meldet sich, falls es Änderungen gibt.`;
+    } catch (err) {
+      console.error(err);
+      st.className = "error"; st.textContent = "Speichern fehlgeschlagen. Bitte später nochmals versuchen.";
+    } finally {
+      $("btnSenden").disabled = false;
+    }
+  });
+
+  $("btnSuchen").addEventListener("click", async () => {
+    const q = norm($("suchName").value);
+    if (!q) return;
+    await ladeEintraege();
+    const treffer = eintraege.filter(e => norm(e.name) === q);
+    $("suchResultat").innerHTML = treffer.length
+      ? "<ul>" + treffer.map(e => { const s = schichten.find(x => x.id === e.schichtId);
+          return s ? `<li>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> (${esc(s.zeit)}) ${e.status === "bestaetigt" ? "<span class='ok'>✓ bestätigt</span>" : "<span class='muted'>angemeldet</span>"}</li>` : ""; }).join("") + "</ul>"
+      : "<p class='muted'>Keine Einsätze unter diesem Namen gefunden.</p>";
+  });
+
+  // ====================================================================
+  // ADMIN / OK
+  // ====================================================================
+  $("btnAdminLogin").addEventListener("click", async () => {
+    $("adminError").textContent = "";
+    try {
+      await signInWithEmailAndPassword(auth, $("adminMail").value.trim(), $("adminPass").value);
+      $("adminPass").value = "";
+    } catch (err) {
+      $("adminError").textContent = "Login fehlgeschlagen – E-Mail oder Passwort falsch.";
+    }
+  });
+  $("btnLogoutAdmin").addEventListener("click", () => signOut(auth));
+
+  let istAdmin = false;
+  async function onAdmin(user) {
+    istAdmin = !!user;
+    $("adminLoginBox").style.display = user ? "none" : "block";
+    $("adminContent").style.display = user ? "block" : "none";
+    $("btnLogoutAdmin").style.display = user ? "inline-block" : "none";
+    if (user) await ladeAdmin();
+  }
+  async function ladeAdmin() {
+    try {
+      await Promise.all([ladeConfig(), ladeEintraege(), ladeHelfer()]);
+    } catch (err) {
+      console.error(err);
+      $("globalError").textContent = "Daten konnten nicht geladen werden (Berechtigung?). Ist dieses Konto als OK-Login eingerichtet?";
+      return;
+    }
+    $("globalError").textContent = "";
+    fuelleFilter();
+    renderAdmin();
+  }
+  function renderAdmin() {
+    renderKpis();
+    renderUebersicht();
+    renderHelferTabelle();
+    renderSchichtVerwaltung();
+  }
+
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x === b));
+    document.querySelectorAll(".tab").forEach(t => t.style.display = t.id === "tab-" + b.dataset.tab ? "block" : "none");
+  }));
+
+  function renderKpis() {
+    const bedarf = schichten.reduce((n, s) => n + Number(s.bedarf || 0), 0);
+    const belegt = schichten.reduce((n, s) => n + Math.min(eintraegeVon(s.id).length, s.bedarf), 0);
+    const neu = eintraege.filter(e => e.status !== "bestaetigt").length;
+    const leer = schichten.filter(s => eintraegeVon(s.id).length < s.bedarf).length;
+    const personen = new Set(eintraege.map(e => e.helferId || norm(e.name))).size;
+    $("kpis").innerHTML = [
+      ["Plätze besetzt", `${belegt} / ${bedarf}`],
+      ["Noch offen", bedarf - belegt],
+      ["Einsätze nicht voll", leer],
+      ["Helfer", personen],
+      ["Unbestätigt", neu],
+    ].map(([l, v]) => `<div class="kpi"><span class="muted">${l}</span><strong>${v}</strong></div>`).join("");
+  }
+
+  function fuelleFilter() {
+    $("filterTag").innerHTML = `<option value="">Alle Tage</option>` + TAGE.map(t => `<option value="${t.id}">${esc(t.label)}</option>`).join("");
+    const bereiche = [...new Set(schichten.map(s => s.bereich))];
+    $("filterBereich").innerHTML = `<option value="">Alle Bereiche</option>` + bereiche.map(b => `<option>${esc(b)}</option>`).join("");
+    $("nTag").innerHTML = TAGE.map(t => `<option value="${t.id}">${esc(t.label)}</option>`).join("");
+  }
+  ["filterTag", "filterBereich", "filterOffen"].forEach(i => $(i).addEventListener("change", renderUebersicht));
+  $("btnDrucken").addEventListener("click", () => window.print());
+
+  function schichtOptionen(exceptId) {
+    return schichten.filter(s => s.id !== exceptId).map(s =>
+      `<option value="${s.id}">${esc(tagLabel(s.tag).split(" ")[0])} · ${esc(s.bereich)} – ${esc(s.aufgabe)} (${eintraegeVon(s.id).length}/${s.bedarf})</option>`).join("");
+  }
+
+  function renderUebersicht() {
+    const ft = $("filterTag").value, fb = $("filterBereich").value, fo = $("filterOffen").checked;
+    const liste = schichten.filter(s => (!ft || s.tag === ft) && (!fb || s.bereich === fb) && (!fo || eintraegeVon(s.id).length < s.bedarf));
+    if (!schichten.length) { $("adminUebersicht").innerHTML = "<p>Noch keine Einsätze. Unter <strong>Einsätze verwalten</strong> die Vorlage importieren.</p>"; return; }
+    $("adminUebersicht").innerHTML = gruppiert(liste).map(g =>
+      `<details open><summary>${esc(g.tag.label)}</summary><div>` +
+      g.bereiche.map(b => `<h3>${esc(b.name)} <span class="muted">– Verantwortlich: ${esc([...new Set(b.schichten.map(s => s.verantwortlich))].join(", "))}</span></h3>` +
+        b.schichten.map(s => {
+          const e = eintraegeVon(s.id);
+          return `<div class="schicht"><div class="info">
+              <div class="flex-row"><span><strong>${esc(s.aufgabe)}</strong> <span class="zeit">🕒 ${esc(s.zeit)}${s.hinweis ? " · " + esc(s.hinweis) : ""}</span></span>
+              <span class="badge ${ampel(e.length, s.bedarf)}">${e.length} / ${s.bedarf}</span></div>
+              ${e.map(x => { const h = helfer[x.helferId] || {};
+                return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>
+                  <span class="noprint">
+                    ${x.status !== "bestaetigt" ? `<button class="small" data-act="ok" data-eid="${x.id}" title="bestätigen">✓</button>` : ""}
+                    <select class="small" data-act="move" data-eid="${x.id}" style="width:auto;max-width:200px;font-size:0.8rem;"><option value="">⇄ verschieben…</option>${schichtOptionen(s.id)}</select>
+                    <button class="small danger" data-act="del" data-eid="${x.id}" title="entfernen">✕</button>
+                  </span></div>`; }).join("")}
+              <div class="noprint" style="margin-top:0.3rem;">
+                <select data-act="addsel" data-sid="${s.id}" style="width:auto;max-width:230px;font-size:0.85rem;"><option value="">+ bekannten Helfer einteilen…</option>${helferOptionen(s.id)}</select>
+                <button class="small secondary" data-act="addneu" data-sid="${s.id}">+ neue Person</button>
+              </div>
+            </div></div>`;
+        }).join("")).join("") + "</div></details>").join("") || "<p class='muted'>Keine Einsätze für diesen Filter.</p>";
+
+    const box = $("adminUebersicht");
+    box.querySelectorAll("[data-act=ok]").forEach(b => b.addEventListener("click", () => setEintrag(b.dataset.eid, { status: "bestaetigt" })));
+    box.querySelectorAll("[data-act=del]").forEach(b => b.addEventListener("click", async () => {
+      const e = eintraege.find(x => x.id === b.dataset.eid);
+      if (!confirm(`${e.name} aus diesem Einsatz entfernen?`)) return;
+      await deleteDoc(doc(db, COL_EINTRAEGE, e.id));
+      eintraege = eintraege.filter(x => x.id !== e.id);
+      renderAdmin();
+    }));
+    box.querySelectorAll("[data-act=move]").forEach(sel => sel.addEventListener("change", () => {
+      if (sel.value) setEintrag(sel.dataset.eid, { schichtId: sel.value, status: "bestaetigt" });
+    }));
+    box.querySelectorAll("[data-act=addsel]").forEach(sel => sel.addEventListener("change", () => {
+      if (!sel.value) return;
+      const h = helfer[sel.value];
+      neuerEintrag(sel.dataset.sid, sel.value, `${h.vorname} ${h.name}`);
+    }));
+    box.querySelectorAll("[data-act=addneu]").forEach(b => b.addEventListener("click", async () => {
+      const vn = prompt("Vorname:"); if (!vn) return;
+      const nn = prompt("Name:") || "";
+      const tel = prompt("Telefon (optional):") || "";
+      const hRef = doc(collection(db, COL_HELFER));
+      const h = { vorname: vn.trim(), name: nn.trim(), tel: tel.trim(), mail: "", verein: "", verfuegbar: [], bemerkung: "durch OK erfasst", erstellt: serverTimestamp() };
+      await setDoc(hRef, h);
+      helfer[hRef.id] = h;
+      neuerEintrag(b.dataset.sid, hRef.id, `${h.vorname} ${h.name}`.trim());
+    }));
+  }
+  function helferOptionen(sid) {
+    const schon = new Set(eintraegeVon(sid).map(e => e.helferId));
+    return Object.entries(helfer).filter(([id]) => !schon.has(id))
+      .sort((a, b) => `${a[1].vorname} ${a[1].name}`.localeCompare(`${b[1].vorname} ${b[1].name}`))
+      .map(([id, h]) => `<option value="${id}">${esc(h.vorname)} ${esc(h.name)}</option>`).join("");
+  }
+  async function setEintrag(eid, felder) {
+    await updateDoc(doc(db, COL_EINTRAEGE, eid), felder);
+    Object.assign(eintraege.find(x => x.id === eid), felder);
+    renderAdmin();
+  }
+  async function neuerEintrag(sid, helferId, name) {
+    const ref = doc(collection(db, COL_EINTRAEGE));
+    const e = { schichtId: sid, helferId, name, status: "bestaetigt", erstellt: serverTimestamp() };
+    await setDoc(ref, e);
+    eintraege.push({ id: ref.id, ...e });
+    renderAdmin();
+  }
+
+  // ---- Helferliste ----
+  function helferZeilen() {
+    return Object.entries(helfer).map(([id, h]) => {
+      const eins = eintraege.filter(e => e.helferId === id).map(e => schichten.find(s => s.id === e.schichtId)).filter(Boolean);
+      return { id, ...h, einsaetze: eins };
+    }).sort((a, b) => `${a.name} ${a.vorname}`.localeCompare(`${b.name} ${b.vorname}`));
+  }
+  const verfText = v => (v || []).map(x => { const [t, z] = x.split("_"); return `${tagLabel(t).split(" ")[0].slice(0, 2)} ${z === "V" ? "Vorm." : "Nachm."}`; }).join(", ");
+  const einsatzText = s => `${tagLabel(s.tag).split(" ")[0].slice(0, 2)} ${s.bereich}: ${s.aufgabe} (${s.zeit})`;
+
+  function renderHelferTabelle() {
+    const z = helferZeilen();
+    $("adminHelfer").innerHTML = z.length ? `<table><tr><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Verein</th><th>Einsätze</th><th>Zusätzlich verfügbar</th><th>Bemerkung</th><th></th></tr>` +
+      z.map(h => `<tr><td>${esc(h.vorname)} ${esc(h.name)}</td><td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
+        <td>${h.einsaetze.map(s => esc(einsatzText(s))).join("<br>") || "<span class='muted'>–</span>"}</td>
+        <td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td>
+        <td><button class="small danger" data-hdel="${h.id}">Löschen</button></td></tr>`).join("") + "</table>"
+      : "<p class='muted'>Noch keine Anmeldungen.</p>";
+    $("adminHelfer").querySelectorAll("[data-hdel]").forEach(b => b.addEventListener("click", async () => {
+      const h = helfer[b.dataset.hdel];
+      if (!confirm(`${h.vorname} ${h.name} inkl. aller Einsätze löschen?`)) return;
+      const batch = writeBatch(db);
+      eintraege.filter(e => e.helferId === b.dataset.hdel).forEach(e => batch.delete(doc(db, COL_EINTRAEGE, e.id)));
+      batch.delete(doc(db, COL_HELFER, b.dataset.hdel));
+      await batch.commit();
+      await ladeAdmin();
+    }));
+  }
+
+  $("btnCsv").addEventListener("click", () => {
+    const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [["Tag", "Bereich", "Aufgabe", "Zeit", "Verantwortlich", "Vorname", "Name", "Telefon", "E-Mail", "Verein", "Status"]];
+    schichten.forEach(s => eintraegeVon(s.id).forEach(e => { const h = helfer[e.helferId] || {};
+      rows.push([tagLabel(s.tag), s.bereich, s.aufgabe, s.zeit, s.verantwortlich, h.vorname || e.name, h.name || "", h.tel, h.mail, h.verein, e.status]); }));
+    const csv = "﻿" + rows.map(r => r.map(q).join(";")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `Helfereinsaetze_Fasnacht_${JAHR}.csv`;
+    a.click();
+  });
+
+  // ---- Einsätze verwalten ----
+  function renderSchichtVerwaltung() {
+    $("anmeldungOffen").checked = anmeldungOffen;
+    $("importBox").innerHTML = schichten.length ? "" :
+      `<p><button id="btnImport">Einsätze aus Vorlage ${JAHR} importieren (${VORLAGE.length} Einsätze aus Excel)</button></p>`;
+    if (!schichten.length) $("btnImport").addEventListener("click", importVorlage);
+    $("adminSchichten").innerHTML = schichten.length ? `<table><tr><th>Tag</th><th>Bereich</th><th>Aufgabe</th><th>Zeit</th><th>Bedarf</th><th>Verantwortlich</th><th>Hinweis</th><th></th></tr>` +
+      schichten.map(s => `<tr data-row="${s.id}">
+        <td>${esc(tagLabel(s.tag).split(" ")[0])}</td>
+        <td><input data-f="bereich" value="${esc(s.bereich)}" style="width:110px;"/></td>
+        <td><input data-f="aufgabe" value="${esc(s.aufgabe)}" style="width:190px;"/></td>
+        <td><input data-f="zeit" value="${esc(s.zeit)}" style="width:130px;"/></td>
+        <td><input data-f="bedarf" type="number" min="0" value="${s.bedarf}" style="width:60px;"/></td>
+        <td><input data-f="verantwortlich" value="${esc(s.verantwortlich)}" style="width:140px;"/></td>
+        <td><input data-f="hinweis" value="${esc(s.hinweis)}" style="width:140px;"/></td>
+        <td><button class="small danger" data-sdel="${s.id}">✕</button></td></tr>`).join("") + "</table>" : "";
+    $("adminSchichten").querySelectorAll("input[data-f]").forEach(inp => inp.addEventListener("change", async () => {
+      const sid = inp.closest("tr").dataset.row, f = inp.dataset.f;
+      const wert = f === "bedarf" ? Number(inp.value) : inp.value.trim();
+      await updateDoc(configRef, { [`schichten.${sid}.${f}`]: wert });
+      schichten.find(s => s.id === sid)[f] = wert;
+      $("schichtStatus").textContent = "Gespeichert.";
+      renderKpis(); renderUebersicht();
+    }));
+    $("adminSchichten").querySelectorAll("[data-sdel]").forEach(b => b.addEventListener("click", async () => {
+      if (eintraegeVon(b.dataset.sdel).length) { alert("Es sind noch Helfer eingeteilt. Zuerst verschieben oder entfernen."); return; }
+      if (!confirm("Einsatz löschen?")) return;
+      await updateDoc(configRef, { [`schichten.${b.dataset.sdel}`]: deleteField() });
+      await ladeAdmin();
+    }));
+  }
+  $("anmeldungOffen").addEventListener("change", async () => {
+    anmeldungOffen = $("anmeldungOffen").checked;
+    await setDoc(configRef, { anmeldungOffen }, { merge: true });
+    $("schichtStatus").textContent = anmeldungOffen ? "Anmeldung ist offen." : "Anmeldung ist geschlossen.";
+  });
+  const neueId = () => "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  async function importVorlage() {
+    if (!confirm(`${VORLAGE.length} Einsätze importieren?`)) return;
+    const sch = {};
+    VORLAGE.forEach(([tag, bereich, aufgabe, zeit, bedarf, verantwortlich, hinweis], i) =>
+      sch[`v${String(i).padStart(2, "0")}`] = { tag, bereich, aufgabe, zeit, bedarf, verantwortlich, hinweis, sort: i * 10 });
+    await setDoc(configRef, { schichten: sch, anmeldungOffen: true }, { merge: true });
+    await ladeAdmin();
+  }
+  $("btnNeuSchicht").addEventListener("click", async () => {
+    const s = { tag: $("nTag").value, bereich: $("nBereich").value.trim(), aufgabe: $("nAufgabe").value.trim(),
+      zeit: $("nZeit").value.trim(), bedarf: Number($("nBedarf").value) || 1, verantwortlich: $("nVerantw").value.trim(), hinweis: "",
+      sort: Math.max(0, ...schichten.map(x => x.sort ?? 0)) + 10 };
+    if (!s.bereich || !s.aufgabe) { $("schichtStatus").textContent = "Bereich und Aufgabe ausfüllen."; return; }
+    await setDoc(configRef, { schichten: { [neueId()]: s } }, { merge: true });
+    ["nBereich", "nAufgabe", "nZeit", "nVerantw"].forEach(i => $(i).value = "");
+    $("schichtStatus").textContent = "Einsatz hinzugefügt.";
+    await ladeAdmin();
+  });
+
+  // ====================================================================
+  // START
+  // ====================================================================
+  $("btnHelfer").addEventListener("click", oeffneHelfer);
+  $("btnAdmin").addEventListener("click", () => { zeigeView("adminView"); if (istAdmin) ladeAdmin(); });
+  document.querySelectorAll(".btnBack").forEach(b => b.addEventListener("click", () => zeigeView("startView")));
+
+  if (!konfiguriert) {
+    $("globalError").textContent = "Firebase ist noch nicht eingerichtet (firebaseConfig in index.html ausfüllen).";
+  } else {
+    onAuthStateChanged(auth, onAdmin);
+  }
+  zeigeView(location.hash === "#ok" ? "adminView" : "startView");
+</script>
+</body>
+</html>

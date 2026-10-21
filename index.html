@@ -549,8 +549,7 @@
   $("btnSenden").addEventListener("click", async () => {
     const st = $("formStatus");
     const vorname = $("fVorname").value.trim(), name = $("fName").value.trim(), tel = $("fTel").value.trim();
-    const hatVerf = document.querySelectorAll("[data-verf]:checked").length > 0;
-    if (!auswahl.size && !hatVerf) { st.className = "error"; st.textContent = "Bitte oben mindestens einen Einsatz anhaken (oder unten ankreuzen, wann du sonst helfen könntest)."; return; }
+    if (!auswahl.size) { st.className = "error"; st.textContent = "Bitte oben mindestens einen Einsatz anhaken."; return; }
     if (!vorname || !name || !tel) { st.className = "error"; st.textContent = "Bitte Vorname, Name und Telefon ausfüllen."; return; }
     if (!vereinWert("vereinBox")) { st.className = "error"; st.textContent = "Bitte Verein / Gruppe wählen (oder «Keine»)."; return; }
     $("btnSenden").disabled = true;

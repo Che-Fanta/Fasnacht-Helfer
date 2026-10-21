@@ -4,8 +4,15 @@ rules_version = '2';
 // OK (Login E-Mail/Passwort): alles.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // OK = eingeloggt (Selbstregistrierung in Firebase Auth ist deaktiviert, Logins legt nur der Admin an)
-    function istOK() { return request.auth != null; }
+    // OK = eingeloggt UND E-Mail in der Liste Fasnacht_ok/zugang.mails (im Tool unter "OK-Zugänge" gepflegt).
+    // Registrierung in Firebase bleibt offen; wer nicht freigeschaltet ist, sieht nichts.
+    function istOK() {
+      return request.auth != null && request.auth.token.email != null
+        && request.auth.token.email.lower() in get(/databases/$(database)/documents/Fasnacht_ok/zugang).data.mails;
+    }
+    match /Fasnacht_ok/zugang {
+      allow read, write: if istOK();
+    }
     // Anmeldung global offen UND Einsatz nicht auf "nur OK" gestellt
     function anmeldungErlaubt(jahrCol, sid) {
       let cfg = get(/databases/$(database)/documents/$(jahrCol)/config).data;

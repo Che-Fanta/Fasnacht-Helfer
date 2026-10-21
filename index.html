@@ -691,7 +691,7 @@
       await Promise.all([ladeConfig(), ladeEintraege(), ladeHelfer()]);
     } catch (err) {
       console.error(err);
-      $("globalError").textContent = "Daten konnten nicht geladen werden (Berechtigung?). Ist dieses Konto als OK-Login eingerichtet?";
+      $("globalError").textContent = `Kein Zugriff: ${auth.currentUser?.email || "dieses Konto"} ist nicht als OK freigeschaltet. Bitte ein OK-Mitglied, die E-Mail unter «Einsätze verwalten → OK-Zugänge» freizuschalten.`;
       return;
     }
     $("globalError").textContent = "";

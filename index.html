@@ -476,6 +476,8 @@
   const ichAktiv = () => !!ich;
 
   function renderMeine() {
+    $("dazuHinweis").style.display = ichAktiv() ? "block" : "none";
+    if (ichAktiv()) $("dazuHinweis").textContent = `➕ ${ich.vorname} ${ich.name}: Hake hier weitere Einsätze an und klicke unten im blauen Balken «Ausgewählte Einsätze dazunehmen».`;
     if (!ichAktiv()) { $("meineBox").style.display = "none"; $("formBox").style.display = anmeldungOffen && schichten.length ? "block" : "none"; return; }
     $("meineBox").style.display = "block";
     $("formBox").style.display = "none";

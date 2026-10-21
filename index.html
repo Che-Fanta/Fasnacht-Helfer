@@ -609,7 +609,7 @@
             ${e.status === "bestaetigt" ? "<span class='ok'>✅ definitiv</span>" : "<span style='color:var(--gelb);font-weight:bold;'>🟡 noch nicht bestätigt</span>"}</span>
             ${e.status !== "bestaetigt" ? `<button class="small danger" data-abmelden="${e.id}">Abmelden</button>` : ""}</div>` : ""; }).join("") +
         "<p class='muted'>Definitive Einsätze: Bist du verhindert, organisier bitte deinen Ersatz selber oder melde dich bei der verantwortlichen Person.</p>" +
-        `<p style="margin:0.6rem 0;"><button id="btnDazu">+ Weitere Einsätze dazunehmen</button></p><div id="dazuBox"></div>`
+        (anmeldungOffen ? `<p style="margin:0.6rem 0;"><button id="btnDazu">+ Weitere Einsätze dazunehmen</button></p><div id="dazuBox"></div>` : "")
       : "<p class='muted'>Keine Einsätze unter diesem Namen gefunden.</p>";
     bindeAbmelden($("suchResultat"), () => $("btnSuchen").click());
     // Weitere Einsätze direkt hier unten auswählen (freie, selbst wählbare Einsätze, die die Person noch nicht hat)

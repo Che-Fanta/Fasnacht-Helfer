@@ -56,6 +56,8 @@
   table { width: 100%; border-collapse: collapse; background: white; }
   th, td { border: 1px solid #ddd; padding: 0.35rem; text-align: left; font-size: 0.88rem; vertical-align: top; }
   th { background: #e6edf5; color: var(--blau-dunkel); }
+  th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
+  th[data-sort]:hover { background: #d3deeb; }
   .tabs button { background: #dde3ea; color: var(--blau-dunkel); font-weight: 600; }
   .tabs button.active { background: var(--blau-dunkel); color: white; box-shadow: inset 0 -3px 0 var(--narr); }
   .person { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; padding: 0.2rem 0; border-top: 1px dashed #eee; flex-wrap: wrap; }
@@ -179,6 +181,15 @@
     <div class="box tab" id="tab-anmeldungen" style="display:none;">
       <h2>Alle Anmeldungen – wie ursprünglich eingegangen</h2>
       <p class="muted">Neueste zuerst. «Ursprünglich gewählt» zeigt, was die Person selbst angeklickt hat – «Aktuell eingeteilt» den heutigen Stand nach Einteilung durch das OK.</p>
+      <div class="flex-row noprint" style="justify-content:flex-start; margin-bottom:0.6rem;">
+        <input id="anSuche" placeholder="🔍 Vorname / Name suchen" style="width:220px;"/>
+        <select id="anVerein" style="width:auto;"></select>
+        <select id="anStatus" style="width:auto;">
+          <option value="">Alle</option><option value="offen">mit unbestätigten Einsätzen</option>
+          <option value="best">nur mit bestätigten Einsätzen</option><option value="ohne">ohne Einsatz</option>
+        </select>
+        <span class="muted" id="anAnzahl"></span>
+      </div>
       <div id="adminAnmeldungen" style="overflow-x:auto;"></div>
     </div>
 
@@ -186,6 +197,15 @@
       <div class="flex-row">
         <h2>Alle Helfer</h2>
         <button id="btnCsv" class="secondary small">Export Excel</button>
+      </div>
+      <div class="flex-row noprint" style="justify-content:flex-start; margin-bottom:0.6rem;">
+        <input id="hlSuche" placeholder="🔍 Vorname / Name suchen" style="width:220px;"/>
+        <select id="hlVerein" style="width:auto;"></select>
+        <select id="hlStatus" style="width:auto;">
+          <option value="">Alle</option><option value="offen">mit unbestätigten Einsätzen</option>
+          <option value="best">nur mit bestätigten Einsätzen</option><option value="ohne">ohne Einsatz</option>
+        </select>
+        <span class="muted" id="hlAnzahl"></span>
       </div>
       <div id="adminHelfer" style="overflow-x:auto;"></div>
     </div>
@@ -951,30 +971,88 @@
   const einsatzText = s =>`${tagLabel(s.tag).split(" ")[0].slice(0, 2)} ${s.bereich}: ${s.aufgabe} (${s.zeit})`;
 
   const zeitpunkt = ts => ts?.toDate ? ts.toDate().toLocaleString("de-CH", { dateStyle: "short", timeStyle: "short" }) : "";
+  // ---- Filter + Sortierung für Helferliste und Original-Anmeldungen ----
+  const sortierung = { hl: { key: "name", dir: 1 }, an: { key: "erstellt", dir: -1 } };
+  function fuelleTabellenFilter() {
+    const vereine = [...new Set(Object.values(helfer).flatMap(vereineVon))].sort();
+    ["hl", "an"].forEach(pf => {
+      const alt = $(pf + "Verein").value;
+      $(pf + "Verein").innerHTML = `<option value="">Alle Vereine</option>` + vereine.map(v => `<option>${esc(v)}</option>`).join("");
+      $(pf + "Verein").value = vereine.includes(alt) ? alt : "";
+    });
+  }
+  function gefiltert(pf) {
+    const q = norm($(pf + "Suche").value), v = $(pf + "Verein").value, st = $(pf + "Status").value;
+    const { key, dir } = sortierung[pf];
+    const wert = h => ({
+      vorname: norm(h.vorname), name: norm(h.name) + " " + norm(h.vorname), tel: h.tel || "", mail: norm(h.mail), verein: norm(h.verein),
+      anzahl: h.bestaetigt.length, stunden: h.stunden, einsaetze: h.alle.length, bemerkung: norm(h.bemerkung),
+      erstellt: h.erstellt?.seconds || 0, gewaehlt: (h.angemeldetFuer || []).length,
+    })[key];
+    return helferZeilen().filter(h => {
+      if (q && !norm(`${h.vorname} ${h.name}`).includes(q) && !norm(`${h.name} ${h.vorname}`).includes(q)) return false;
+      if (v && !vereineVon(h).includes(v)) return false;
+      if (st === "offen" && !h.alle.some(x => x.e.status !== "bestaetigt")) return false;
+      if (st === "best" && !h.bestaetigt.length) return false;
+      if (st === "ohne" && h.alle.length) return false;
+      return true;
+    }).sort((a, b) => { const x = wert(a), y = wert(b); return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "de")) * dir; });
+  }
+  // Spaltenkopf: klickbar zum Sortieren, Pfeil zeigt die aktuelle Richtung
+  function kopf(pf, spalten) {
+    const { key, dir } = sortierung[pf];
+    return "<tr>" + spalten.map(([k, label, title]) => k
+      ? `<th data-sort="${k}"${title ? ` title="${title}"` : ""}>${label}${k === key ? (dir > 0 ? " ▲" : " ▼") : " <span class='muted'>↕</span>"}</th>`
+      : `<th>${label}</th>`).join("") + "</tr>";
+  }
+  function bindeSortierung(pf, box, render) {
+    box.querySelectorAll("th[data-sort]").forEach(th => th.addEventListener("click", () => {
+      const s = sortierung[pf];
+      if (s.key === th.dataset.sort) s.dir *= -1;
+      else { s.key = th.dataset.sort; s.dir = ["anzahl", "stunden", "einsaetze", "erstellt", "gewaehlt"].includes(s.key) ? -1 : 1; }
+      render();
+    }));
+  }
+  ["Suche", "Verein", "Status"].forEach(f => {
+    const ev = f === "Suche" ? "input" : "change";
+    $("hl" + f).addEventListener(ev, () => renderHelferTabelle());
+    $("an" + f).addEventListener(ev, () => renderAnmeldungen());
+  });
+  const einsatzListe = h => h.alle.map(({ e, s }) => `${e.status === "bestaetigt" ? "✅" : "🟡"} ${esc(einsatzText(s))}`).join("<br>") || "<span class='muted'>–</span>";
+
   function renderAnmeldungen() {
-    const z = helferZeilen().sort((a, b) => (b.erstellt?.seconds || 0) - (a.erstellt?.seconds || 0));
-    $("adminAnmeldungen").innerHTML = z.length ? `<table><tr><th>Eingegangen</th><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Verein</th><th>Ursprünglich gewählt</th><th>Zusätzlich verfügbar</th><th>Bemerkung</th><th>Aktuell eingeteilt</th></tr>` +
+    const z = gefiltert("an");
+    $("anAnzahl").textContent = `${z.length} von ${Object.keys(helfer).length}`;
+    $("adminAnmeldungen").innerHTML = Object.keys(helfer).length ? `<table>` +
+      kopf("an", [["erstellt", "Eingegangen"], ["vorname", "Vorname"], ["name", "Name"], ["tel", "Telefon"], ["mail", "E-Mail"], ["verein", "Verein"],
+        ["gewaehlt", "Ursprünglich gewählt"], [null, "Zusätzlich verfügbar"], ["bemerkung", "Bemerkung"], ["einsaetze", "Aktuell eingeteilt"]]) +
       z.map(h => {
-        const eins = eintraege.filter(e => e.helferId === h.id).map(e => ({ e, s: schichten.find(s => s.id === e.schichtId) })).filter(x => x.s);
         const quelle = h.angemeldetFuer ? (h.angemeldetFuer.length ? h.angemeldetFuer.map(esc).join("<br>") : "<span class='muted'>keinen Einsatz gewählt</span>")
           : h.bemerkung === "durch OK erfasst" || !h.erstellt ? "<span class='muted'>durch OK erfasst</span>" : "<span class='muted'>(vor dieser Funktion angemeldet)</span>";
-        return `<tr><td>${esc(zeitpunkt(h.erstellt))}</td><td>${esc(h.vorname)} ${esc(h.name)}</td><td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
-          <td>${quelle}</td><td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td>
-          <td>${eins.map(({ e, s }) => `${e.status === "bestaetigt" ? "✅" : "🟡"} ${esc(einsatzText(s))}`).join("<br>") || "<span class='muted'>–</span>"}</td></tr>`;
-      }).join("") + "</table>"
+        return `<tr><td>${esc(zeitpunkt(h.erstellt))}</td><td>${esc(h.vorname)}</td><td>${esc(h.name)}</td><td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
+          <td>${quelle}</td><td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td><td>${einsatzListe(h)}</td></tr>`;
+      }).join("") + "</table>" + (z.length ? "" : "<p class='muted'>Keine Treffer für diesen Filter.</p>")
       : "<p class='muted'>Noch keine Anmeldungen.</p>";
+    bindeSortierung("an", $("adminAnmeldungen"), renderAnmeldungen);
   }
-
   function renderHelferTabelle() {
-    const z = helferZeilen();
-    $("adminHelfer").innerHTML = z.length ? `<table><tr><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Verein</th><th title="nur bestätigte">Anzahl ✅</th><th title="nur bestätigte">Stunden ✅</th><th>Einsätze</th><th>Zusätzlich verfügbar</th><th>Bemerkung</th><th></th></tr>` +
-      z.map(h => `<tr><td>${esc(h.vorname)} ${esc(h.name)}${z.filter(x => norm(x.vorname + " " + x.name) === norm(h.vorname + " " + h.name)).length > 1 ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td><td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
+    fuelleTabellenFilter();
+    const alle = helferZeilen();
+    const z = gefiltert("hl");
+    const doppelt = h => alle.filter(x => norm(x.vorname + " " + x.name) === norm(h.vorname + " " + h.name)).length > 1;
+    $("hlAnzahl").textContent = `${z.length} von ${alle.length}`;
+    $("adminHelfer").innerHTML = alle.length ? `<table>` +
+      kopf("hl", [["vorname", "Vorname"], ["name", "Name"], ["tel", "Telefon"], ["mail", "E-Mail"], ["verein", "Verein"],
+        ["anzahl", "Anzahl ✅", "nur bestätigte"], ["stunden", "Stunden ✅", "nur bestätigte"], ["einsaetze", "Einsätze"],
+        [null, "Zusätzlich verfügbar"], ["bemerkung", "Bemerkung"], [null, ""]]) +
+      z.map(h => `<tr><td>${esc(h.vorname)}</td><td>${esc(h.name)}${doppelt(h) ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td>
+        <td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
         <td style="text-align:center;">${h.bestaetigt.length}</td>
         <td style="text-align:right; white-space:nowrap;"><strong>${fmtH(h.stunden)} h</strong></td>
-        <td>${h.alle.map(({ e, s }) => `${e.status === "bestaetigt" ? "✅" : "🟡"} ${esc(einsatzText(s))}`).join("<br>") || "<span class='muted'>–</span>"}</td>
-        <td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td>
-        <td><button class="small danger" data-hdel="${h.id}">Löschen</button></td></tr>`).join("") + "</table>"
+        <td>${einsatzListe(h)}</td><td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td>
+        <td><button class="small danger" data-hdel="${h.id}">Löschen</button></td></tr>`).join("") + "</table>" + (z.length ? "" : "<p class='muted'>Keine Treffer für diesen Filter.</p>")
       : "<p class='muted'>Noch keine Anmeldungen.</p>";
+    bindeSortierung("hl", $("adminHelfer"), renderHelferTabelle);
     $("adminHelfer").querySelectorAll("[data-hdel]").forEach(b => b.addEventListener("click", async () => {
       const h = helfer[b.dataset.hdel];
       if (!confirm(`${h.vorname} ${h.name} inkl. aller Einsätze löschen?`)) return;

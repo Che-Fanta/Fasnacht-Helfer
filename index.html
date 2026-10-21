@@ -816,7 +816,10 @@
       renderAdmin();
     }));
     box.querySelectorAll("[data-act=move]").forEach(sel => sel.addEventListener("change", () => {
-      if (sel.value) setEintrag(sel.dataset.eid, { schichtId: sel.value, status: "bestaetigt" });
+      if (!sel.value) return;
+      const e = eintraege.find(x => x.id === sel.dataset.eid);
+      if (eintraegeVon(sel.value).some(x => x.helferId === e.helferId)) { alert(`${e.name} ist in diesem Einsatz schon eingeteilt.`); sel.value = ""; return; }
+      setEintrag(sel.dataset.eid, { schichtId: sel.value, status: "bestaetigt" });
     }));
     box.querySelectorAll("[data-act=addsel]").forEach(sel => sel.addEventListener("change", () => {
       if (!sel.value) return;

@@ -542,7 +542,7 @@
         b.schichten.map(s => {
           const e = eintraegeVon(s.id);
           return `<div class="schicht"><div class="info">
-              <div class="flex-row"><span><strong>${esc(s.aufgabe)}</strong> <span class="zeit">🕒 ${esc(s.zeit)}${s.hinweis ? " · " + esc(s.hinweis) : ""}</span></span>
+              <div class="flex-row"><span><strong>${esc(s.aufgabe)}</strong> <span class="zeit">🕒 ${esc(s.zeit)}${s.hinweis ? " · " + esc(s.hinweis) : ""}${s.nurOK ? " · 🔒 nur OK-Einteilung" : ""}</span></span>
               <span class="badge ${ampel(e.length, s.bedarf)}">${e.length} / ${s.bedarf}</span></div>
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>

@@ -239,15 +239,19 @@
         <button id="btnNeuSchicht">Hinzufügen</button>
       </div>
       <p id="schichtStatus" class="ok"></p>
+    </div>
 
-      <h2 style="margin-top:1.5rem;">OK-Zugänge</h2>
-      <p class="muted">E-Mail freischalten → Link <strong id="okLink"></strong> schicken → die Person klickt «Erstes Mal? Konto erstellen» und wählt ihr Passwort selbst.</p>
+    <div class="box tab" id="tab-adminaccounts" style="display:none;">
+      <h2>Admin-Accounts (OK-Logins)</h2>
+      <p class="muted">Neues OK-Mitglied: E-Mail und Passwort eingeben → «Account anlegen». Danach kann es sich unter <strong id="okLink"></strong> einloggen.</p>
       <div class="flex-row" style="justify-content:flex-start;">
-        <input id="okMail" type="email" placeholder="E-Mail des OK-Mitglieds" style="width:260px;"/>
-        <button id="btnOkFrei">Freischalten</button>
+        <input id="okMail" type="email" placeholder="E-Mail" style="width:260px;"/>
+        <input id="okPass" type="text" placeholder="Passwort (mind. 6 Zeichen)" autocomplete="off" style="width:220px;"/>
+        <button id="btnOkFrei">Account anlegen</button>
       </div>
       <p id="okStatus"></p>
       <div id="okListe"></div>
+      <p class="muted">«Entfernen» sperrt den Zugriff sofort. Passwort vergessen/ändern: Firebase Console → Authentication → Nutzer.</p>
     </div>
   </div>
 </div>

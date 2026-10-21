@@ -696,9 +696,9 @@
   $("okLink").textContent = location.origin + location.pathname + "#ok";
   async function renderOkListe() {
     try { const snap = await getDoc(zugangRef); okMails = snap.exists() ? (snap.data().mails || []) : []; } catch { okMails = []; }
-    const ich = (auth.currentUser?.email || "").toLowerCase();
+    const selbst = (auth.currentUser?.email || "").toLowerCase();
     $("okListe").innerHTML = okMails.length ? "<table style='max-width:520px;'><tr><th>Freigeschaltete E-Mail</th><th></th></tr>" +
-      okMails.map(m => `<tr><td>${esc(m)}</td><td>${m === ich ? "<span class='muted'>(du)</span>" : `<button class="small danger" data-okweg="${esc(m)}">Entfernen</button>`}</td></tr>`).join("") + "</table>" : "";
+      okMails.map(m => `<tr><td>${esc(m)}</td><td>${m === selbst ? "<span class='muted'>(du)</span>" : `<button class="small danger" data-okweg="${esc(m)}">Entfernen</button>`}</td></tr>`).join("") + "</table>" : "";
     $("okListe").querySelectorAll("[data-okweg]").forEach(b => b.addEventListener("click", async () => {
       if (!confirm(`${b.dataset.okweg} den OK-Zugang entziehen?`)) return;
       await setDoc(zugangRef, { mails: okMails.filter(m => m !== b.dataset.okweg) });

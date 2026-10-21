@@ -613,7 +613,7 @@
       : "<p class='muted'>Keine Einsätze unter diesem Namen gefunden.</p>";
     bindeAbmelden($("suchResultat"), () => $("btnSuchen").click());
     // Weitere Einsätze direkt hier unten auswählen (freie, selbst wählbare Einsätze, die die Person noch nicht hat)
-    if (treffer.length) $("btnDazu").addEventListener("click", () => {
+    if (treffer.length && anmeldungOffen) $("btnDazu").addEventListener("click", () => {
       const person = treffer[0];
       const schon = new Set(treffer.map(e => e.schichtId));
       const frei = schichten.filter(s => !s.nurOK && !schon.has(s.id) && eintraegeVon(s.id).length < s.bedarf);

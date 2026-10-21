@@ -4,11 +4,8 @@ rules_version = '2';
 // OK (Login E-Mail/Passwort): alles.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // OK = eingeloggt UND E-Mail in der OK-Liste (Tab "OK-Mitglieder") bzw. Haupt-Admin
-    function istOK() {
-      return request.auth != null && (request.auth.token.email == 'peterbrunner426@hotmail.com'
-        || request.auth.token.email in get(/databases/$(database)/documents/Fasnacht_ok/mitglieder).data.get('mails', []));
-    }
+    // OK = eingeloggt (Selbstregistrierung in Firebase Auth ist deaktiviert, Logins legt nur der Admin an)
+    function istOK() { return request.auth != null; }
     // Anmeldung global offen UND Einsatz nicht auf "nur OK" gestellt
     function anmeldungErlaubt(jahrCol, sid) {
       let cfg = get(/databases/$(database)/documents/$(jahrCol)/config).data;
@@ -32,10 +29,6 @@ service cloud.firestore {
       // Noch nicht bestätigte Einsätze darf jeder abmelden, bestätigte nur das OK
       allow delete: if col.matches('Fasnacht_[0-9]+_eintraege')
         && (istOK() || resource.data.status == 'angemeldet');
-    }
-    // Liste der OK-Mitglieder: nur OK
-    match /Fasnacht_ok/{id} {
-      allow read, write: if istOK();
     }
     // Kontaktdaten: Helfer dürfen nur anlegen, lesen nur das OK
     match /{col}/{id} {

@@ -552,8 +552,8 @@
       [...auswahl].forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
         { schichtId: sid, helferId: hRef.id, name: `${vorname} ${name}`, status: "angemeldet", uid: user.uid, erstellt: serverTimestamp() }));
       await batch.commit();
-      if (!user.isAnonymous) { /* OK-Mitglied trägt jemanden über das Formular ein: kein "Ich" merken */ }
-      else speichereIch({ helferId: hRef.id, uid: user.uid, vorname, name });
+      // Nur bei echtem Helfer-Login merken (nicht, wenn ein OK-Mitglied das Formular nutzt)
+      if (user.isAnonymous) speichereIch({ helferId: hRef.id, uid: user.uid, vorname, name });
       const liste = [...auswahl].map(sid => { const s = schichten.find(x => x.id === sid); return `${tagLabel(s.tag)}: ${s.bereich} – ${s.aufgabe} (${s.zeit})`; });
       auswahl.clear();
       ["fVorname", "fName", "fTel", "fMail", "fBemerkung"].forEach(i => $(i).value = "");

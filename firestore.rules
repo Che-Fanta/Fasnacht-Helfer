@@ -4,6 +4,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function istOK() { return request.auth != null; }
+    // Anmeldung global offen UND Einsatz nicht auf "nur OK" gestellt
+    function anmeldungErlaubt(jahrCol, sid) {
+      let cfg = get(/databases/$(database)/documents/$(jahrCol)/config).data;
+      return cfg.get('anmeldungOffen', true) == true
+        && cfg.schichten.get(sid, {}).get('nurOK', false) == false;
+    }
 
     // Einsätze + Einstellungen
     match /{col}/config {

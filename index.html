@@ -242,15 +242,24 @@
 
     <div class="box tab" id="tab-adminaccounts" style="display:none;">
       <h2>Admin-Accounts (OK-Logins)</h2>
-      <p class="muted">Neues OK-Mitglied: E-Mail und Passwort eingeben → «Account anlegen». Danach kann es sich unter <strong id="okLink"></strong> einloggen.</p>
+      <div style="background:#e6edf5; border-left:5px solid var(--blau); padding:0.8rem 1rem; border-radius:4px; margin-bottom:1rem;">
+        <h3 style="margin-top:0;">So kommt ein neues OK-Mitglied ins Tool</h3>
+        <ol style="margin:0; padding-left:1.2rem; line-height:1.6;">
+          <li><strong>Du:</strong> Unten die E-Mail-Adresse der Person eingeben und auf <strong>«Freischalten»</strong> klicken.</li>
+          <li><strong>Du:</strong> Der Person diesen Link schicken: <strong id="okLink"></strong> <button id="btnLinkKopieren" class="small secondary">Link kopieren</button></li>
+          <li><strong>Neues OK-Mitglied:</strong> Link öffnen → <strong>«Noch kein Konto? Registrieren»</strong> klicken.</li>
+          <li><strong>Neues OK-Mitglied:</strong> Die freigeschaltete E-Mail eingeben, ein eigenes Passwort wählen (mind. 6 Zeichen), Passwort wiederholen → <strong>«Konto erstellen»</strong>.</li>
+          <li>Fertig – die Person ist direkt eingeloggt. Ab dann normal mit E-Mail und Passwort über «Login».</li>
+        </ol>
+        <p class="muted" style="margin:0.6rem 0 0;">Nur freigeschaltete E-Mails haben Zugriff. Wer sich mit einer anderen E-Mail registriert, sieht nichts.
+          «Entfernen» sperrt den Zugriff sofort. Passwort vergessen: auf der Login-Seite «Passwort vergessen?» klicken.</p>
+      </div>
       <div class="flex-row" style="justify-content:flex-start;">
-        <input id="okMail" type="email" placeholder="E-Mail" style="width:260px;"/>
-        <input id="okPass" type="text" placeholder="Passwort (mind. 6 Zeichen)" autocomplete="off" style="width:220px;"/>
-        <button id="btnOkFrei">Account anlegen</button>
+        <input id="okMail" type="email" placeholder="E-Mail des neuen OK-Mitglieds" style="width:280px;"/>
+        <button id="btnOkFrei">Freischalten</button>
       </div>
       <p id="okStatus"></p>
       <div id="okListe"></div>
-      <p class="muted">«Entfernen» sperrt den Zugriff sofort. Passwort vergessen/ändern: Firebase Console → Authentication → Nutzer.</p>
     </div>
   </div>
 </div>

@@ -535,10 +535,7 @@
     $("btnSenden").disabled = true;
     st.className = "muted"; st.textContent = "Wird gespeichert…";
     try {
-      await ladeEintraege();
-      const vollJetzt = [...auswahl].filter(sid => { const s = schichten.find(x => x.id === sid); return !s || s.nurOK || eintraegeVon(sid).length >= s.bedarf; });
-      if (vollJetzt.length) {
-        vollJetzt.forEach(sid => auswahl.delete(sid));
+      if (!(await pruefeFrei())) {
         renderHelferSchichten();
         st.className = "error"; st.textContent = "Ein Einsatz wurde in der Zwischenzeit voll. Bitte Auswahl prüfen und nochmals absenden.";
         return;

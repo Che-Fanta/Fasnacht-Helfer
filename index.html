@@ -400,7 +400,7 @@
     st.className = "muted"; st.textContent = "Wird gespeichert…";
     try {
       await ladeEintraege();
-      const vollJetzt = [...auswahl].filter(sid => { const s = schichten.find(x => x.id === sid); return !s || eintraegeVon(sid).length >= s.bedarf; });
+      const vollJetzt = [...auswahl].filter(sid => { const s = schichten.find(x => x.id === sid); return !s || s.nurOK || eintraegeVon(sid).length >= s.bedarf; });
       if (vollJetzt.length) {
         vollJetzt.forEach(sid => auswahl.delete(sid));
         renderHelferSchichten();

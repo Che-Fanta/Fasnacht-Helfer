@@ -598,7 +598,8 @@
   $("btnLogoutAdmin").addEventListener("click", () => signOut(auth));
 
   let istAdmin = false;
-  async function onAdmin(user) {
+  async function onAdmin(authUser) {
+    const user = authUser && !authUser.isAnonymous ? authUser : null;   // anonymes Helfer-Login ist kein OK
     istAdmin = !!user;
     $("adminLoginBox").style.display = user ? "none" : "block";
     $("adminContent").style.display = user ? "block" : "none";

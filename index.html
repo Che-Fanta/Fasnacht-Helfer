@@ -598,19 +598,51 @@
       .sort((a, b) => { const sa = schichten.find(s => s.id === a.schichtId), sb = schichten.find(s => s.id === b.schichtId);
         return tagIndex(sa.tag) - tagIndex(sb.tag) || (sa.sort ?? 0) - (sb.sort ?? 0); });
     $("suchResultat").innerHTML = treffer.length
-      ? `<p style="margin:0.6rem 0;"><button id="btnDazu">+ Weitere Einsätze dazunehmen</button></p>` + treffer.map(e => { const s = schichten.find(x => x.id === e.schichtId);
+      ? treffer.map(e => { const s = schichten.find(x => x.id === e.schichtId);
           return s ? `<div class="person" style="padding:0.5rem 0;"><span>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> (${esc(s.zeit)})<br>
             ${e.status === "bestaetigt" ? "<span class='ok'>✅ definitiv</span>" : "<span style='color:var(--gelb);font-weight:bold;'>🟡 noch nicht bestätigt</span>"}</span>
             ${e.status !== "bestaetigt" ? `<button class="small danger" data-abmelden="${e.id}">Abmelden</button>` : ""}</div>` : ""; }).join("") +
-        "<p class='muted'>Definitive Einsätze: Bist du verhindert, organisier bitte deinen Ersatz selber oder melde dich bei der verantwortlichen Person.</p>"
+        "<p class='muted'>Definitive Einsätze: Bist du verhindert, organisier bitte deinen Ersatz selber oder melde dich bei der verantwortlichen Person.</p>" +
+        `<p style="margin:0.6rem 0;"><button id="btnDazu">+ Weitere Einsätze dazunehmen</button></p><div id="dazuBox"></div>`
       : "<p class='muted'>Keine Einsätze unter diesem Namen gefunden.</p>";
     bindeAbmelden($("suchResultat"), () => $("btnSuchen").click());
-    // Gefundene Person als "Ich" übernehmen → oben Einsätze anhaken und dazunehmen
+    // Weitere Einsätze direkt hier unten auswählen (freie, selbst wählbare Einsätze, die die Person noch nicht hat)
     if (treffer.length) $("btnDazu").addEventListener("click", () => {
-      const [vorname, ...rest] = treffer[0].name.trim().split(/\s+/);
-      speichereIch({ helferId: treffer[0].helferId, vorname, name: rest.join(" ") });
-      renderHelferSchichten();
-      $("auswahlTitel").scrollIntoView({ behavior: "smooth" });
+      const person = treffer[0];
+      const schon = new Set(treffer.map(e => e.schichtId));
+      const frei = schichten.filter(s => !s.nurOK && !schon.has(s.id) && eintraegeVon(s.id).length < s.bedarf);
+      $("btnDazu").style.display = "none";
+      $("dazuBox").innerHTML = frei.length ? `<div class="box" style="border-top-color:var(--narr);">
+          <h3 style="margin-top:0;">Weitere Einsätze für ${esc(person.name)}</h3>` +
+        gruppiert(frei).map(g => `<p style="margin:0.6rem 0 0.2rem;"><strong>${esc(g.tag.label)}</strong></p>` +
+          g.bereiche.map(b => b.schichten.map(s => `<label style="margin-top:0.3rem;"><input type="checkbox" data-dazu="${s.id}"/>
+            ${esc(b.name)} – ${esc(s.aufgabe)} <span class="zeit">(${esc(s.zeit)}, ${s.bedarf - eintraegeVon(s.id).length} frei)</span></label>`).join("")).join("")).join("") +
+        `<p><button id="btnDazuOk">Ausgewählte Einsätze dazunehmen</button> <button id="btnDazuAbbr" class="secondary">Abbrechen</button></p>
+          <p id="dazuStatus"></p></div>`
+        : "<p class='muted'>Im Moment sind keine weiteren Einsätze frei.</p>";
+      if (!frei.length) return;
+      $("btnDazuAbbr").addEventListener("click", () => { $("dazuBox").innerHTML = ""; $("btnDazu").style.display = ""; });
+      $("btnDazuOk").addEventListener("click", async () => {
+        const ids = [...$("dazuBox").querySelectorAll("[data-dazu]:checked")].map(c => c.dataset.dazu);
+        if (!ids.length) { $("dazuStatus").className = "error"; $("dazuStatus").textContent = "Bitte mindestens einen Einsatz anhaken."; return; }
+        $("btnDazuOk").disabled = true;
+        try {
+          await ladeEintraege();
+          const voll = ids.filter(sid => { const s = schichten.find(x => x.id === sid); return !s || eintraegeVon(sid).length >= s.bedarf; });
+          if (voll.length) { $("dazuStatus").className = "error"; $("dazuStatus").textContent = "Ein Einsatz wurde in der Zwischenzeit voll. Bitte nochmals wählen."; $("btnDazuOk").disabled = false; return; }
+          const batch = writeBatch(db);
+          ids.forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
+            { schichtId: sid, helferId: person.helferId, name: person.name, status: "angemeldet", erstellt: serverTimestamp() }));
+          await batch.commit();
+          await ladeEintraege();
+          renderHelferSchichten();
+          $("btnSuchen").click();   // Liste mit den neuen (🟡) Einsätzen neu anzeigen
+        } catch (err) {
+          console.error(err);
+          $("dazuStatus").className = "error"; $("dazuStatus").textContent = "Speichern fehlgeschlagen. Bitte später nochmals versuchen.";
+          $("btnDazuOk").disabled = false;
+        }
+      });
     });
   });
 

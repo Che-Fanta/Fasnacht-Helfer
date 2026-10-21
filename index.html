@@ -413,9 +413,6 @@
   $("infoBox").innerHTML = "<h2>Wichtige Informationen</h2>" +
     INFOS.map(([t, x]) => `<p><strong>${esc(t)}:</strong> ${esc(x)}</p>`).join("") +
     "<p>Wir bedanken uns herzlich und freuen uns riesig auf euch!</p>";
-  $("verfRows").innerHTML = VERF_TAGE.map(t =>
-    `<tr><td style="text-align:left;">${esc(tagLabel(t))}</td>
-     <td><input type="checkbox" data-verf="${t}_V"/></td><td><input type="checkbox" data-verf="${t}_N"/></td></tr>`).join("");
 
   // Verein-Auswahl (Formular + OK-Dialog): "Keine" schliesst die anderen aus
   document.querySelectorAll(".vereinBox").forEach(box => {

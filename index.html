@@ -171,7 +171,7 @@
           <select id="filterBereich" style="width:auto;"></select>
           <label style="display:inline;"><input type="checkbox" id="filterOffen"/> nur nicht voll</label>
         </div>
-        <div><button id="btnExcel" class="small">Export Excel</button> <button id="btnDruckansicht" class="small">Druckansicht / PDF</button></div>
+        <div><button id="btnExcel" class="small">Export Excel</button> <button id="btnDrucken" class="secondary small">Drucken / PDF</button></div>
       </div>
       <p class="muted noprint">🟡 neu = selbst angemeldet, noch nicht bestätigt. Mit <strong>✓</strong> bestätigen, mit <strong>⇄</strong> in einen anderen Einsatz verschieben.</p>
       <div id="adminUebersicht"></div>
@@ -692,51 +692,7 @@
     $("nTag").innerHTML = TAGE.map(t => `<option value="${t.id}">${esc(t.label)}</option>`).join("");
   }
   ["filterTag", "filterBereich", "filterOffen"].forEach(i => $(i).addEventListener("change", renderUebersicht));
-  // Druckansicht: eigenes Fenster, A4, eine Tabelle pro Tag/Bereich, leere Zeilen für offene Plätze. Filter werden übernommen.
-  $("btnDruckansicht").addEventListener("click", () => {
-    const ft = $("filterTag").value, fb = $("filterBereich").value, fo = $("filterOffen").checked;
-    const liste = schichten.filter(s => (!ft || s.tag === ft) && (!fb || s.bereich === fb) && (!fo || eintraegeVon(s.id).length < s.bedarf));
-    const teile = gruppiert(liste).map(g => g.bereiche.map(b => {
-      const zeilen = b.schichten.map(s => {
-        const e = eintraegeVon(s.id);
-        const personen = e.map(x => { const h = helfer[x.helferId] || {};
-          return `<tr><td>${esc(x.name)}</td><td>${esc(h.tel || "")}</td><td>${esc(h.verein || "")}</td><td>${x.status === "bestaetigt" ? "✔" : "offen"}</td></tr>`; });
-        for (let i = e.length; i < s.bedarf; i++) personen.push(`<tr class="leer"><td>&nbsp;</td><td></td><td></td><td></td></tr>`);
-        return `<div class="einsatz"><div class="ekopf"><strong>${esc(s.aufgabe)}</strong> · ${esc(s.zeit)}
-            <span class="rechts">${Math.min(e.length, s.bedarf)} / ${s.bedarf}</span></div>
-          ${s.hinweis ? `<div class="hinweis">${esc(s.hinweis)}</div>` : ""}
-          <table><tr><th style="width:32%">Name</th><th style="width:22%">Telefon</th><th style="width:34%">Verein</th><th>Bestätigt</th></tr>${personen.join("")}</table></div>`;
-      }).join("");
-      return `<section><h2>${esc(g.tag.label)} – ${esc(b.name)}</h2>
-        <p class="verantw">Verantwortlich: ${esc([...new Set(b.schichten.map(s => s.verantwortlich))].join(", "))}</p>${zeilen}</section>`;
-    }).join("")).join("");
-    const w = window.open("", "_blank");
-    if (!w) { alert("Bitte Pop-ups für diese Seite erlauben."); return; }
-    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Einsatzplan Fasnacht ${JAHR}</title>
-      <style>
-        @page { size: A4; margin: 12mm; }
-        body { font-family: "Open Sans", Arial, sans-serif; color: #001d3b; font-size: 10.5pt; margin: 0 auto; max-width: 190mm; }
-        .top { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #001d3b; padding-bottom: 4px; margin-bottom: 8px; }
-        .top img { height: 42px; filter: brightness(0); }
-        h1 { font-size: 15pt; margin: 0; } h2 { font-size: 12.5pt; margin: 14px 0 2px; background: #001d3b; color: white; padding: 3px 6px; }
-        .verantw { margin: 2px 0 6px; font-size: 9.5pt; }
-        .einsatz { break-inside: avoid; margin-bottom: 8px; }
-        .ekopf { border-bottom: 1px solid #094B92; padding: 2px 0; } .rechts { float: right; }
-        .hinweis { font-size: 9pt; font-style: italic; }
-        table { width: 100%; border-collapse: collapse; margin-top: 2px; }
-        th, td { border: 1px solid #999; padding: 3px 5px; text-align: left; font-size: 9.5pt; }
-        th { background: #e6edf5; } tr.leer td { height: 16px; }
-        section { break-inside: auto; }
-        .knopf { position: fixed; top: 8px; right: 8px; padding: 8px 14px; background: #094B92; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11pt; }
-        @media print { .knopf { display: none; } }
-      </style></head><body>
-      <button class="knopf" onclick="window.print()">Drucken / als PDF speichern</button>
-      <div class="top"><div><h1>Einsatzplan Fasnacht ${JAHR}</h1><span>Stand: ${new Date().toLocaleString("de-CH", { dateStyle: "short", timeStyle: "short" })}</span></div>
-        <img src="${new URL("logo.png", location.href).href}" alt=""></div>
-      ${teile || "<p>Keine Einsätze für diesen Filter.</p>"}
-      </body></html>`);
-    w.document.close();
-  });
+  $("btnDrucken").addEventListener("click", () => window.print());
 
   function schichtOptionen(exceptId) {
     return schichten.filter(s => s.id !== exceptId).map(s =>

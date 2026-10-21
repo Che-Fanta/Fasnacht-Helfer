@@ -447,8 +447,83 @@
   function updateSticky() {
     $("sticky").style.display = auswahl.size ? "block" : "none";
     $("stickyText").textContent = `${auswahl.size} Einsatz${auswahl.size === 1 ? "" : "e"} ausgewählt`;
+    $("btnZumFormular").textContent = ich ? "Ausgewählte Einsätze dazunehmen" : "Weiter zu meinen Angaben ↓";
   }
-  $("btnZumFormular").addEventListener("click", () => $("formBox").scrollIntoView({ behavior: "smooth" }));
+  $("btnZumFormular").addEventListener("click", () => ich ? einsaetzeDazunehmen() : $("formBox").scrollIntoView({ behavior: "smooth" }));
+
+  // ---- "Ich" auf diesem Gerät: anonymes Firebase-Login + gemerkte helferId ----
+  // Nur über dieses Login darf ein Helfer seine eigenen, noch unbestätigten Einsätze abmelden.
+  const ICH_KEY = `fasnacht_${JAHR}_ich`;
+  let ich = null;   // { helferId, uid, vorname, name }
+  try { ich = JSON.parse(localStorage.getItem(ICH_KEY) || "null"); } catch { ich = null; }
+  function speichereIch(v) {
+    ich = v;
+    try { v ? localStorage.setItem(ICH_KEY, JSON.stringify(v)) : localStorage.removeItem(ICH_KEY); } catch {}
+  }
+  async function geraeteLogin() {
+    if (auth.currentUser) return auth.currentUser;
+    return (await signInAnonymously(auth)).user;
+  }
+  // "Ich" gilt nur, wenn dasselbe anonyme Login noch aktiv ist
+  const ichAktiv = () => !!(ich && auth.currentUser && auth.currentUser.uid === ich.uid);
+
+  function renderMeine() {
+    if (!ichAktiv()) { $("meineBox").style.display = "none"; $("formBox").style.display = anmeldungOffen && schichten.length ? "block" : "none"; return; }
+    $("meineBox").style.display = "block";
+    $("formBox").style.display = "none";
+    $("meinName").textContent = ich.vorname;
+    const meine = eintraege.filter(e => e.helferId === ich.helferId)
+      .map(e => ({ e, s: schichten.find(x => x.id === e.schichtId) })).filter(x => x.s)
+      .sort((a, b) => tagIndex(a.s.tag) - tagIndex(b.s.tag) || (a.s.sort ?? 0) - (b.s.sort ?? 0));
+    $("meineListe").innerHTML = meine.length ? meine.map(({ e, s }) => `<div class="person" style="padding:0.5rem 0;">
+        <span>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> <span class="zeit">(${esc(s.zeit)})</span><br>
+        ${e.status === "bestaetigt" ? "<span class='ok'>✅ definitiv</span>" : "<span style='color:var(--gelb);font-weight:bold;'>🟡 noch nicht bestätigt</span>"}
+        <span class="muted">· Verantwortlich: ${esc(s.verantwortlich)}</span></span>
+        ${e.status !== "bestaetigt" ? `<button class="small danger" data-abmelden="${e.id}">Abmelden</button>` : ""}
+      </div>`).join("")
+      : "<p class='muted'>Du hast im Moment keine Einsätze. Wähle unten einen aus.</p>";
+    $("meineListe").querySelectorAll("[data-abmelden]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("Von diesem Einsatz abmelden?")) return;
+      b.disabled = true;
+      try {
+        await deleteDoc(doc(db, COL_EINTRAEGE, b.dataset.abmelden));
+        await ladeEintraege();
+        renderHelferSchichten();
+      } catch (err) {
+        console.error(err);
+        alert("Abmelden nicht möglich – evtl. wurde der Einsatz in der Zwischenzeit vom OK bestätigt.");
+        await ladeEintraege(); renderHelferSchichten();
+      }
+    }));
+  }
+  $("btnNichtIch").addEventListener("click", () => { speichereIch(null); renderHelferSchichten(); $("formBox").scrollIntoView({ behavior: "smooth" }); });
+
+  async function pruefeFrei() {
+    await ladeEintraege();
+    const vollJetzt = [...auswahl].filter(sid => { const s = schichten.find(x => x.id === sid); return !s || s.nurOK || eintraegeVon(sid).length >= s.bedarf; });
+    vollJetzt.forEach(sid => auswahl.delete(sid));
+    return vollJetzt.length === 0;
+  }
+  async function einsaetzeDazunehmen() {
+    if (!auswahl.size) return;
+    $("btnZumFormular").disabled = true;
+    try {
+      if (!(await pruefeFrei())) { renderHelferSchichten(); alert("Ein Einsatz wurde in der Zwischenzeit voll. Bitte Auswahl prüfen."); return; }
+      const batch = writeBatch(db);
+      [...auswahl].forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
+        { schichtId: sid, helferId: ich.helferId, name: `${ich.vorname} ${ich.name}`, status: "angemeldet", uid: ich.uid, erstellt: serverTimestamp() }));
+      await batch.commit();
+      auswahl.clear();
+      await ladeEintraege();
+      renderHelferSchichten();
+      $("meineBox").scrollIntoView({ behavior: "smooth" });
+    } catch (err) {
+      console.error(err);
+      alert("Speichern fehlgeschlagen. Bitte später nochmals versuchen.");
+    } finally {
+      $("btnZumFormular").disabled = false;
+    }
+  }
 
   $("btnSenden").addEventListener("click", async () => {
     const st = $("formStatus");

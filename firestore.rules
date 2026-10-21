@@ -29,6 +29,10 @@ service cloud.firestore {
       allow delete: if col.matches('Fasnacht_[0-9]+_eintraege')
         && (istOK() || resource.data.status == 'angemeldet');
     }
+    // Liste der OK-Mitglieder: nur OK
+    match /Fasnacht_ok/{id} {
+      allow read, write: if istOK();
+    }
     // Kontaktdaten: Helfer dürfen nur anlegen, lesen nur das OK
     match /{col}/{id} {
       allow create: if col.matches('Fasnacht_[0-9]+_helfer');

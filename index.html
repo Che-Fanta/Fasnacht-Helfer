@@ -366,8 +366,9 @@
         g.bereiche.map(b => `<h3>${esc(b.name)}</h3>` + b.schichten.map(s => {
           const e = eintraegeVon(s.id);
           const voll = e.length >= s.bedarf;
-          return `<div class="schicht">
-            <input type="checkbox" data-sid="${s.id}" ${auswahl.has(s.id) ? "checked" : ""} ${voll || !anmeldungOffen ? "disabled" : ""}/>
+          const nurOK = s.nurOK === true;
+          return `<div class="schicht"${nurOK ? ' style="opacity:0.75;"' : ""}>
+            <input type="checkbox" data-sid="${s.id}" ${auswahl.has(s.id) ? "checked" : ""} ${voll || nurOK || !anmeldungOffen ? "disabled" : ""}/>
             <div class="info"><strong>${esc(s.aufgabe)}</strong>
               <div class="zeit">🕒 ${esc(s.zeit)} · Verantwortlich: ${esc(s.verantwortlich)}${s.hinweis ? " · " + esc(s.hinweis) : ""}</div>
               ${e.length ? `<div class="namen">👥 ${e.map(x => esc(x.name)).join(", ")}</div>` : ""}

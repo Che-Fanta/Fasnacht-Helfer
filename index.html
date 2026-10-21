@@ -859,7 +859,7 @@
       await ladeOk();
       const liste = okMitglieder.filter(m => m.mail !== mail && m.mail !== HAUPT_ADMIN);
       if (mail !== HAUPT_ADMIN) liste.push({ mail, passwort: pass, erstellt: new Date().toLocaleDateString("de-CH") });
-      await setDoc(okRef, { liste });
+      await speichereOk(liste);
       $("okMail").value = ""; $("okPass").value = "";
       st.className = "ok"; st.textContent = `${mail} wurde als OK-Mitglied hinzugefügt.${hinweis}`;
       renderOkListe();

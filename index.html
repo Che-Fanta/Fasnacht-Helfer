@@ -605,7 +605,7 @@
       const [vorname, ...rest] = treffer[0].name.trim().split(/\s+/);
       speichereIch({ helferId: treffer[0].helferId, vorname, name: rest.join(" ") });
       renderHelferSchichten();
-      $("meineBox").scrollIntoView({ behavior: "smooth" });
+      $("auswahlTitel").scrollIntoView({ behavior: "smooth" });
     });
   });
 

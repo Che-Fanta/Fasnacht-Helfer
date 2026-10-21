@@ -596,6 +596,13 @@
         "<p class='muted'>Definitive Einsätze: Bist du verhindert, organisier bitte deinen Ersatz selber oder melde dich bei der verantwortlichen Person.</p>"
       : "<p class='muted'>Keine Einsätze unter diesem Namen gefunden.</p>";
     bindeAbmelden($("suchResultat"), () => $("btnSuchen").click());
+    // Gefundene Person als "Ich" übernehmen → oben Einsätze anhaken und dazunehmen
+    if (treffer.length) $("btnDazu").addEventListener("click", () => {
+      const [vorname, ...rest] = treffer[0].name.trim().split(/\s+/);
+      speichereIch({ helferId: treffer[0].helferId, vorname, name: rest.join(" ") });
+      renderHelferSchichten();
+      $("meineBox").scrollIntoView({ behavior: "smooth" });
+    });
   });
 
   // ====================================================================

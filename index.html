@@ -507,9 +507,12 @@
   }
 
   function fuelleFilter() {
+    const ft = $("filterTag").value, fb = $("filterBereich").value;  // Auswahl nach Neuladen behalten
     $("filterTag").innerHTML = `<option value="">Alle Tage</option>` + TAGE.map(t => `<option value="${t.id}">${esc(t.label)}</option>`).join("");
     const bereiche = [...new Set(schichten.map(s => s.bereich))];
     $("filterBereich").innerHTML = `<option value="">Alle Bereiche</option>` + bereiche.map(b => `<option>${esc(b)}</option>`).join("");
+    $("filterTag").value = ft;
+    $("filterBereich").value = bereiche.includes(fb) ? fb : "";
     $("nTag").innerHTML = TAGE.map(t => `<option value="${t.id}">${esc(t.label)}</option>`).join("");
   }
   ["filterTag", "filterBereich", "filterOffen"].forEach(i => $(i).addEventListener("change", renderUebersicht));

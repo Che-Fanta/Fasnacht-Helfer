@@ -1028,7 +1028,7 @@
         ["gewaehlt", "Ursprünglich gewählt"], [null, "Zusätzlich verfügbar"], ["bemerkung", "Bemerkung"], ["einsaetze", "Aktuell eingeteilt"]]) +
       z.map(h => {
         const quelle = h.angemeldetFuer ? (h.angemeldetFuer.length ? h.angemeldetFuer.map(esc).join("<br>") : "<span class='muted'>keinen Einsatz gewählt</span>")
-          : h.bemerkung === "durch OK erfasst" || !h.erstellt ? "<span class='muted'>durch OK erfasst</span>" : "<span class='muted'>(vor dieser Funktion angemeldet)</span>";
+          : h.quelle === "ok" || h.bemerkung === "durch OK erfasst" || !h.erstellt ? "<span class='muted'>durch OK erfasst</span>" : "<span class='muted'>(vor dieser Funktion angemeldet)</span>";
         return `<tr><td>${esc(zeitpunkt(h.erstellt))}</td><td>${esc(h.vorname)}</td><td>${esc(h.name)}</td><td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
           <td>${quelle}</td><td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td><td>${einsatzListe(h)}</td></tr>`;
       }).join("") + "</table>" + (z.length ? "" : "<p class='muted'>Keine Treffer für diesen Filter.</p>")

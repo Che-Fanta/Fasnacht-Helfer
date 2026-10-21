@@ -357,8 +357,8 @@
 
   function renderHelferSchichten() {
     $("anmeldungZu").style.display = anmeldungOffen ? "none" : "block";
-    $("formBox").style.display = anmeldungOffen ? "block" : "none";
-    if (!schichten.length) { $("helferSchichten").innerHTML = "<p class='muted'>Noch keine Einsätze erfasst.</p>"; return; }
+    $("formBox").style.display = anmeldungOffen && schichten.length ? "block" : "none";
+    if (!schichten.length) { $("helferSchichten").innerHTML = "<p class='error'>Die Einsätze sind noch nicht freigeschaltet. Bitte schau später nochmals vorbei.</p>"; return; }
     $("helferSchichten").innerHTML = gruppiert(schichten).map(g => {
       const offen = g.bereiche.reduce((n, b) => n + b.schichten.filter(s => eintraegeVon(s.id).length < s.bedarf).length, 0);
       return `<details open><summary>${esc(g.tag.label)} <span style="font-weight:normal;">– ${offen} Einsätze mit freien Plätzen</span></summary><div>` +

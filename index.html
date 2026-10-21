@@ -756,7 +756,7 @@
     } catch (err) {
       console.error(err);
       $("adminContent").style.display = "none";
-      $("globalError").textContent = `Kein Zugriff: ${auth.currentUser?.email || "dieses Konto"} ist nicht als OK freigeschaltet. Bitte ein OK-Mitglied, die E-Mail unter «Einsätze verwalten → OK-Zugänge» freizuschalten.`;
+      $("globalError").textContent = `Kein Zugriff: ${auth.currentUser?.email || "dieses Konto"} ist nicht als OK freigeschaltet. Bitte ein OK-Mitglied, dich im Tab «Admin-Accounts» hinzuzufügen.`;
       return;
     }
     $("globalError").textContent = "";

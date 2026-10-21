@@ -687,19 +687,6 @@
       $("adminError").textContent = "Login fehlgeschlagen – E-Mail oder Passwort falsch.";
     }
   });
-  $("btnRegistrieren").addEventListener("click", async () => {
-    const mail = $("adminMail").value.trim(), pass = $("adminPass").value;
-    $("adminError").textContent = "";
-    if (!mail.includes("@") || pass.length < 6) { $("adminError").textContent = "Oben E-Mail und ein Passwort (mind. 6 Zeichen) eingeben, dann «Konto erstellen» klicken."; return; }
-    try {
-      await createUserWithEmailAndPassword(auth, mail, pass);   // loggt direkt ein
-      $("adminPass").value = "";
-    } catch (err) {
-      $("adminError").textContent = err.code === "auth/email-already-in-use" ? "Für diese E-Mail gibt es schon ein Konto – bitte normal mit «Login» anmelden."
-        : err.code === "auth/weak-password" ? "Passwort zu kurz (mind. 6 Zeichen)."
-        : err.code === "auth/invalid-email" ? "Ungültige E-Mail-Adresse." : "Konto erstellen fehlgeschlagen.";
-    }
-  });
   $("btnLogoutAdmin").addEventListener("click", () => signOut(auth));
 
   // ---- OK-Zugänge: Liste freigeschalteter E-Mails (Fasnacht_ok/zugang.mails), von den Firestore-Regeln geprüft ----

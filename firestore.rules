@@ -15,7 +15,8 @@ service cloud.firestore {
       allow read: if col.matches('Fasnacht_[0-9]+_eintraege');
       allow create: if col.matches('Fasnacht_[0-9]+_eintraege')
         && request.resource.data.keys().hasOnly(['schichtId', 'helferId', 'name', 'status', 'erstellt'])
-        && (request.resource.data.status == 'angemeldet' || istOK());
+        && (istOK() || (request.resource.data.status == 'angemeldet'
+            && get(/databases/$(database)/documents/$(col.replace('_eintraege', ''))/config).data.get('anmeldungOffen', true) == true));
       allow update, delete: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');
     }
     // Kontaktdaten: Helfer dürfen nur anlegen, lesen nur das OK

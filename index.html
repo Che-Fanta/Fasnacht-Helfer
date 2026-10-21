@@ -390,7 +390,8 @@
   $("btnSenden").addEventListener("click", async () => {
     const st = $("formStatus");
     const vorname = $("fVorname").value.trim(), name = $("fName").value.trim(), tel = $("fTel").value.trim();
-    if (!auswahl.size) { st.className = "error"; st.textContent = "Bitte oben mindestens einen Einsatz anhaken."; return; }
+    const hatVerf = document.querySelectorAll("[data-verf]:checked").length > 0;
+    if (!auswahl.size && !hatVerf) { st.className = "error"; st.textContent = "Bitte oben mindestens einen Einsatz anhaken (oder unten ankreuzen, wann du sonst helfen könntest)."; return; }
     if (!vorname || !name || !tel) { st.className = "error"; st.textContent = "Bitte Vorname, Name und Telefon ausfüllen."; return; }
     $("btnSenden").disabled = true;
     st.className = "muted"; st.textContent = "Wird gespeichert…";

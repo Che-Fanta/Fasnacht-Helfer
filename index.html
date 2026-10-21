@@ -412,7 +412,7 @@
   async function oeffneHelfer() {
     zeigeView("helferView");
     $("helferSchichten").textContent = "Lade Einsätze…";
-    await Promise.all([ladeConfig(), ladeEintraege()]);
+    await Promise.all([ladeConfig(), ladeEintraege(), auth.authStateReady()]);
     renderHelferSchichten();
   }
 

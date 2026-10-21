@@ -488,7 +488,8 @@
         <span class="muted">· Verantwortlich: ${esc(s.verantwortlich)}</span></span>
         ${e.status !== "bestaetigt" ? `<button class="small danger" data-abmelden="${e.id}">Abmelden</button>` : ""}
       </div>`).join("")
-      : "<p class='muted'>Du hast im Moment keine Einsätze. Wähle unten einen aus.</p>";
+      : "<p class='muted'>Du hast im Moment keine Einsätze.</p>";
+    $("meineListe").innerHTML += "<p><strong>➕ Weitere Einsätze:</strong> unten anhaken und dann «Ausgewählte Einsätze dazunehmen» klicken.</p>";
     bindeAbmelden($("meineListe"));
   }
   // Abmelden von noch nicht bestätigten Einsätzen (Meine Einsätze + Suche)

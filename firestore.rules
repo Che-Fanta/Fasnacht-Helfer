@@ -6,9 +6,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // OK = eingeloggt UND E-Mail in der Liste Fasnacht_ok/zugang.mails (im Tool unter "OK-Zugänge" gepflegt).
     // Registrierung in Firebase bleibt offen; wer nicht freigeschaltet ist, sieht nichts.
+    // Haupt-Admin (Konto-ID) hat immer Zugriff, damit die Liste nie leer/gesperrt sein kann.
     function istOK() {
-      return request.auth != null && request.auth.token.email != null
-        && request.auth.token.email.lower() in get(/databases/$(database)/documents/Fasnacht_ok/zugang).data.mails;
+      return request.auth != null && (request.auth.uid == 'C3SRgh5YE5RlfgEOcfALQfdjpXA2'
+        || (request.auth.token.email != null
+            && request.auth.token.email.lower() in get(/databases/$(database)/documents/Fasnacht_ok/zugang).data.get('mails', [])));
     }
     match /Fasnacht_ok/zugang {
       allow read, write: if istOK();

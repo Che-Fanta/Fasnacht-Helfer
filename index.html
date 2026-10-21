@@ -56,6 +56,15 @@
   table { width: 100%; border-collapse: collapse; background: white; }
   th, td { border: 1px solid #ddd; padding: 0.35rem; text-align: left; font-size: 0.88rem; vertical-align: top; }
   th { background: #e6edf5; color: var(--blau-dunkel); }
+  /* Breite Tabellen: eigener Scrollbereich, Kopfzeile und Vorname bleiben beim Scrollen stehen */
+  body.breit { max-width: 1500px; }
+  .scroll { overflow: auto; max-height: 75vh; border: 1px solid #ddd; border-radius: 4px; }
+  .scroll table { border-collapse: separate; border-spacing: 0; }
+  .scroll th { position: sticky; top: 0; z-index: 2; }
+  .scroll td.fix, .scroll th.fix { position: sticky; left: 0; z-index: 1; background: white; box-shadow: 2px 0 2px rgba(0,0,0,0.08); }
+  .scroll th.fix { z-index: 3; background: #e6edf5; }
+  .nowrap { white-space: nowrap; }
+  .klein { font-size: 0.8rem; }
   th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
   th[data-sort]:hover { background: #d3deeb; }
   .tabs button { background: #dde3ea; color: var(--blau-dunkel); font-weight: 600; }
@@ -192,7 +201,7 @@
         </select>
         <span class="muted" id="anAnzahl"></span>
       </div>
-      <div id="adminAnmeldungen" style="overflow-x:auto;"></div>
+      <div id="adminAnmeldungen" class="scroll"></div>
     </div>
 
     <div class="box tab" id="tab-helfer" style="display:none;">
@@ -209,7 +218,7 @@
         </select>
         <span class="muted" id="hlAnzahl"></span>
       </div>
-      <div id="adminHelfer" style="overflow-x:auto;"></div>
+      <div id="adminHelfer" class="scroll"></div>
     </div>
 
     <div class="box tab" id="tab-schichten" style="display:none;">
@@ -386,6 +395,7 @@
 
   function zeigeView(id) {
     ["startView", "helferView", "adminView"].forEach(v => $(v).style.display = v === id ? "block" : "none");
+    document.body.classList.toggle("breit", id === "adminView");
     $("sticky").style.display = "none";
     window.scrollTo(0, 0);
   }
@@ -1055,7 +1065,7 @@
   function kopf(pf, spalten) {
     const { key, dir } = sortierung[pf];
     return "<tr>" + spalten.map(([k, label, title]) => k
-      ? `<th data-sort="${k}"${title ? ` title="${title}"` : ""}>${label}${k === key ? (dir > 0 ? " ▲" : " ▼") : " <span class='muted'>↕</span>"}</th>`
+      ? `<th data-sort="${k}"${k === "vorname" ? ' class="fix"' : ""}${title ? ` title="${title}"` : ""}>${label}${k === key ? (dir > 0 ? " ▲" : " ▼") : " <span class='muted'>↕</span>"}</th>`
       : `<th>${label}</th>`).join("") + "</tr>";
   }
   function bindeSortierung(pf, box, render) {
@@ -1078,12 +1088,12 @@
     $("anAnzahl").textContent = `${z.length} von ${Object.keys(helfer).length}`;
     $("adminAnmeldungen").innerHTML = Object.keys(helfer).length ? `<table>` +
       kopf("an", [["erstellt", "Eingegangen"], ["vorname", "Vorname"], ["name", "Name"], ["tel", "Telefon"], ["mail", "E-Mail"], ["verein", "Verein"],
-        ["gewaehlt", "Ursprünglich gewählt"], [null, "Zusätzlich verfügbar"], ["bemerkung", "Bemerkung"], ["einsaetze", "Aktuell eingeteilt"]]) +
+        ["gewaehlt", "Ursprünglich gewählt"], ["bemerkung", "Bemerkung"], ["einsaetze", "Aktuell eingeteilt"]]) +
       z.map(h => {
         const quelle = h.angemeldetFuer ? (h.angemeldetFuer.length ? h.angemeldetFuer.map(esc).join("<br>") : "<span class='muted'>keinen Einsatz gewählt</span>")
           : h.quelle === "ok" || h.bemerkung === "durch OK erfasst" || !h.erstellt ? "<span class='muted'>durch OK erfasst</span>" : "<span class='muted'>(vor dieser Funktion angemeldet)</span>";
-        return `<tr><td>${esc(zeitpunkt(h.erstellt))}</td><td>${esc(h.vorname)}</td><td>${esc(h.name)}</td><td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
-          <td>${quelle}</td><td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td><td>${einsatzListe(h)}</td></tr>`;
+        return `<tr><td class="nowrap klein">${esc(zeitpunkt(h.erstellt))}</td><td class="fix">${esc(h.vorname)}</td><td>${esc(h.name)}</td><td class="nowrap">${esc(h.tel)}</td><td class="klein">${esc(h.mail)}</td><td>${esc(h.verein)}</td>
+          <td class="klein" style="min-width:220px;">${quelle}</td><td class="klein">${esc(h.bemerkung)}</td><td class="klein" style="min-width:240px;">${einsatzListe(h)}</td></tr>`;
       }).join("") + "</table>" + (z.length ? "" : "<p class='muted'>Keine Treffer für diesen Filter.</p>")
       : "<p class='muted'>Noch keine Anmeldungen.</p>";
     bindeSortierung("an", $("adminAnmeldungen"), renderAnmeldungen);
@@ -1097,12 +1107,12 @@
     $("adminHelfer").innerHTML = alle.length ? `<table>` +
       kopf("hl", [["vorname", "Vorname"], ["name", "Name"], ["tel", "Telefon"], ["mail", "E-Mail"], ["verein", "Verein"],
         ["anzahl", "Anzahl ✅", "nur bestätigte"], ["stunden", "Stunden ✅", "nur bestätigte"], ["einsaetze", "Einsätze"],
-        [null, "Zusätzlich verfügbar"], ["bemerkung", "Bemerkung"], [null, ""]]) +
-      z.map(h => `<tr><td>${esc(h.vorname)}</td><td>${esc(h.name)}${doppelt(h) ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td>
-        <td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
+        ["bemerkung", "Bemerkung"], [null, ""]]) +
+      z.map(h => `<tr><td class="fix">${esc(h.vorname)}</td><td>${esc(h.name)}${doppelt(h) ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td>
+        <td class="nowrap">${esc(h.tel)}</td><td class="klein">${esc(h.mail)}</td><td>${esc(h.verein)}</td>
         <td style="text-align:center;">${h.bestaetigt.length}</td>
         <td style="text-align:right; white-space:nowrap;"><strong>${fmtH(h.stunden)} h</strong></td>
-        <td>${einsatzListe(h)}</td><td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td>
+        <td class="klein" style="min-width:260px;">${einsatzListe(h)}</td><td class="klein">${esc(h.bemerkung)}</td>
         <td><button class="small danger" data-hdel="${h.id}">Löschen</button></td></tr>`).join("") + "</table>" + (z.length ? "" : "<p class='muted'>Keine Treffer für diesen Filter.</p>")
       : "<p class='muted'>Noch keine Anmeldungen.</p>";
     bindeSortierung("hl", $("adminHelfer"), renderHelferTabelle);
@@ -1150,10 +1160,10 @@
       ...Object.entries(dashboardDaten(false)).sort((a, b) => b[1].stunden - a[1].stunden)
         .map(([v, d]) => [v, d.helfer, Math.round(d.einsaetze * 10) / 10, Math.round(d.stunden * 10) / 10])], [24, 10, 10, 10]);
 
-    blatt("Helfer", [["Vorname", "Name", "Telefon", "E-Mail", "Verein", "Anzahl Einsätze (bestätigt)", "Stunden (bestätigt)", "Einsätze", "Zusätzlich verfügbar", "Bemerkung"],
+    blatt("Helfer", [["Vorname", "Name", "Telefon", "E-Mail", "Verein", "Anzahl Einsätze (bestätigt)", "Stunden (bestätigt)", "Einsätze", "Bemerkung"],
       ...helferZeilen().map(h => [h.vorname, h.name, h.tel, h.mail, h.verein, h.bestaetigt.length, h.stunden,
-        h.einsaetze.map(einsatzText).join("\n"), verfText(h.verfuegbar), h.bemerkung])],
-      [14, 16, 16, 26, 16, 10, 9, 60, 26, 30]);
+        h.einsaetze.map(einsatzText).join("\n"), h.bemerkung])],
+      [14, 16, 16, 26, 16, 10, 9, 60, 30]);
 
     XLSX.writeFile(wb, `Helferliste_Fasnacht_${JAHR}.xlsx`);
   }

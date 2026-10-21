@@ -493,7 +493,9 @@
     const belegt = schichten.reduce((n, s) => n + Math.min(eintraegeVon(s.id).length, s.bedarf), 0);
     const neu = eintraege.filter(e => e.status !== "bestaetigt").length;
     const leer = schichten.filter(s => eintraegeVon(s.id).length < s.bedarf).length;
-    const personen = new Set(eintraege.map(e => e.helferId || norm(e.name))).size;
+    const personen = Object.keys(helfer).length;
+    const mitEinsatz = new Set(eintraege.map(e => e.helferId));
+    const ohneEinsatz = Object.keys(helfer).filter(id => !mitEinsatz.has(id)).length;
     $("kpis").innerHTML = [
       ["Plätze besetzt", `${belegt} / ${bedarf}`],
       ["Noch offen", bedarf - belegt],

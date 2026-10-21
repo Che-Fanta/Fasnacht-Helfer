@@ -373,7 +373,8 @@
               <div class="zeit">🕒 ${esc(s.zeit)} · Verantwortlich: ${esc(s.verantwortlich)}${s.hinweis ? " · " + esc(s.hinweis) : ""}</div>
               ${e.length ? `<div class="namen">👥 ${e.map(x => esc(x.name)).join(", ")}</div>` : ""}
             </div>
-            <span class="badge ${ampel(e.length, s.bedarf)}">${voll ? "voll" : `${s.bedarf - e.length} frei`}</span>
+            ${nurOK && !voll ? `<span class="badge" style="background:#6c757d;">Einteilung durch OK</span>`
+              : `<span class="badge ${ampel(e.length, s.bedarf)}">${voll ? "voll" : `${s.bedarf - e.length} frei`}</span>`}
           </div>`;
         }).join("")).join("") + "</div></details>";
     }).join("");

@@ -679,6 +679,21 @@
   const verfText = v => (v || []).map(x => { const [t, z] = x.split("_"); return `${tagLabel(t).split(" ")[0].slice(0, 2)} ${z === "V" ? "Vorm." : "Nachm."}`; }).join(", ");
   const einsatzText = s => `${tagLabel(s.tag).split(" ")[0].slice(0, 2)} ${s.bereich}: ${s.aufgabe} (${s.zeit})`;
 
+  const zeitpunkt = ts => ts?.toDate ? ts.toDate().toLocaleString("de-CH", { dateStyle: "short", timeStyle: "short" }) : "";
+  function renderAnmeldungen() {
+    const z = helferZeilen().sort((a, b) => (b.erstellt?.seconds || 0) - (a.erstellt?.seconds || 0));
+    $("adminAnmeldungen").innerHTML = z.length ? `<table><tr><th>Eingegangen</th><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Verein</th><th>Ursprünglich gewählt</th><th>Zusätzlich verfügbar</th><th>Bemerkung</th><th>Aktuell eingeteilt</th></tr>` +
+      z.map(h => {
+        const eins = eintraege.filter(e => e.helferId === h.id).map(e => ({ e, s: schichten.find(s => s.id === e.schichtId) })).filter(x => x.s);
+        const quelle = h.angemeldetFuer ? (h.angemeldetFuer.length ? h.angemeldetFuer.map(esc).join("<br>") : "<span class='muted'>keinen Einsatz gewählt</span>")
+          : h.bemerkung === "durch OK erfasst" || !h.erstellt ? "<span class='muted'>durch OK erfasst</span>" : "<span class='muted'>(vor dieser Funktion angemeldet)</span>";
+        return `<tr><td>${esc(zeitpunkt(h.erstellt))}</td><td>${esc(h.vorname)} ${esc(h.name)}</td><td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
+          <td>${quelle}</td><td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td>
+          <td>${eins.map(({ e, s }) => `${e.status === "bestaetigt" ? "✅" : "🟡"} ${esc(einsatzText(s))}`).join("<br>") || "<span class='muted'>–</span>"}</td></tr>`;
+      }).join("") + "</table>"
+      : "<p class='muted'>Noch keine Anmeldungen.</p>";
+  }
+
   function renderHelferTabelle() {
     const z = helferZeilen();
     $("adminHelfer").innerHTML = z.length ? `<table><tr><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Verein</th><th>Einsätze</th><th>Zusätzlich verfügbar</th><th>Bemerkung</th><th></th></tr>` +

@@ -471,11 +471,15 @@
     const q = norm($("suchName").value);
     if (!q) return;
     await ladeEintraege();
-    const treffer = eintraege.filter(e => norm(e.name) === q);
-    $("suchResultat").innerHTML = treffer.length
+    // Nur vom OK bestätigte Einsätze anzeigen
+    const alle = eintraege.filter(e => norm(e.name) === q);
+    const treffer = alle.filter(e => e.status === "bestaetigt");
+    const wartend = alle.length - treffer.length;
+    $("suchResultat").innerHTML = (treffer.length
       ? "<ul>" + treffer.map(e => { const s = schichten.find(x => x.id === e.schichtId);
-          return s ? `<li>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> (${esc(s.zeit)}) ${e.status === "bestaetigt" ? "<span class='ok'>✓ bestätigt</span>" : "<span class='muted'>angemeldet</span>"}</li>` : ""; }).join("") + "</ul>"
-      : "<p class='muted'>Keine Einsätze unter diesem Namen gefunden.</p>";
+          return s ? `<li>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> (${esc(s.zeit)}) <span class='ok'>✓ bestätigt</span></li>` : ""; }).join("") + "</ul>"
+      : "<p class='muted'>Keine bestätigten Einsätze unter diesem Namen gefunden.</p>") +
+      (wartend ? `<p class="muted">${wartend} Anmeldung${wartend === 1 ? "" : "en"} wartet noch auf Bestätigung durch das OK.</p>` : "");
   });
 
   // ====================================================================

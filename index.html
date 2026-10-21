@@ -445,7 +445,9 @@
       const batch = writeBatch(db);
       const hRef = doc(collection(db, COL_HELFER));
       batch.set(hRef, { vorname, name, tel, mail: $("fMail").value.trim(), verein: vereinWert("vereinBox"),
-        verfuegbar, bemerkung: $("fBemerkung").value.trim(), erstellt: serverTimestamp() });
+        verfuegbar, bemerkung: $("fBemerkung").value.trim(), erstellt: serverTimestamp(),
+        // Ursprüngliche Anmeldung als Text festhalten (bleibt, auch wenn das OK später umteilt)
+        angemeldetFuer: [...auswahl].map(sid => einsatzText(schichten.find(x => x.id === sid))) });
       [...auswahl].forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
         { schichtId: sid, helferId: hRef.id, name: `${vorname} ${name}`, status: "angemeldet", erstellt: serverTimestamp() }));
       await batch.commit();

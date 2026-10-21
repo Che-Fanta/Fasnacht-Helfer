@@ -182,6 +182,19 @@
       <div id="adminUebersicht"></div>
     </div>
 
+    <div class="box tab" id="tab-admins" style="display:none;">
+      <h2>OK-Mitglieder (Admin-Logins)</h2>
+      <p class="muted">Neues OK-Mitglied: E-Mail und Passwort eingeben (mind. 6 Zeichen). Danach kann es sich sofort über «OK-Login» anmelden.</p>
+      <div class="flex-row" style="justify-content:flex-start;">
+        <input id="okMail" type="email" placeholder="E-Mail" style="width:240px;"/>
+        <input id="okPass" type="text" placeholder="Passwort" autocomplete="off" style="width:160px;"/>
+        <button id="btnOkNeu">OK-Mitglied hinzufügen</button>
+      </div>
+      <p id="okStatus"></p>
+      <div id="okListe" style="overflow-x:auto;"></div>
+      <p class="muted">Die Liste ist nur für eingeloggte OK-Mitglieder sichtbar. «Entfernen» nimmt die Person nur aus dieser Liste – den Login ganz löschen oder ein Passwort ändern: Firebase Console → Authentication → Nutzer.</p>
+    </div>
+
     <div class="box tab" id="tab-anmeldungen" style="display:none;">
       <h2>Alle Anmeldungen – wie ursprünglich eingegangen</h2>
       <p class="muted">Neueste zuerst. «Ursprünglich gewählt» zeigt, was die Person selbst angeklickt hat – «Aktuell eingeteilt» den heutigen Stand nach Einteilung durch das OK.</p>

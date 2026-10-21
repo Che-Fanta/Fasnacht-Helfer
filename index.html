@@ -680,6 +680,7 @@
         <td><input data-f="bedarf" type="number" min="0" value="${s.bedarf}" style="width:60px;"/></td>
         <td><input data-f="verantwortlich" value="${esc(s.verantwortlich)}" style="width:140px;"/></td>
         <td><input data-f="hinweis" value="${esc(s.hinweis)}" style="width:140px;"/></td>
+        <td style="text-align:center;"><input type="checkbox" data-f="offen" ${s.nurOK ? "" : "checked"}/></td>
         <td><button class="small danger" data-sdel="${s.id}">✕</button></td></tr>`).join("") + "</table>" : "";
     $("adminSchichten").querySelectorAll("input[data-f]").forEach(inp => inp.addEventListener("change", async () => {
       const sid = inp.closest("tr").dataset.row, f = inp.dataset.f;

@@ -444,7 +444,7 @@
       const verfuegbar = [...document.querySelectorAll("[data-verf]:checked")].map(c => c.dataset.verf);
       const batch = writeBatch(db);
       const hRef = doc(collection(db, COL_HELFER));
-      batch.set(hRef, { vorname, name, tel, mail: $("fMail").value.trim(), verein: [...[...document.querySelectorAll("[data-verein]:checked")].map(c => c.dataset.verein), $("fVerein").value.trim()].filter(Boolean).join(", "),
+      batch.set(hRef, { vorname, name, tel, mail: $("fMail").value.trim(), verein: vereinWert("vereinBox"),
         verfuegbar, bemerkung: $("fBemerkung").value.trim(), erstellt: serverTimestamp() });
       [...auswahl].forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
         { schichtId: sid, helferId: hRef.id, name: `${vorname} ${name}`, status: "angemeldet", erstellt: serverTimestamp() }));

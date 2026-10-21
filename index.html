@@ -836,7 +836,7 @@
       const m = okMitglieder[Number(b.dataset.okdel)];
       if (!confirm(`${m.mail} aus der Liste entfernen?`)) return;
       okMitglieder.splice(Number(b.dataset.okdel), 1);
-      await setDoc(okRef, { liste: okMitglieder.filter(x => x.mail !== HAUPT_ADMIN) });
+      await speichereOk(okMitglieder.filter(x => x.mail !== HAUPT_ADMIN));
       renderOkListe();
     }));
   }

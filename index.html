@@ -541,6 +541,7 @@
         return;
       }
       const verfuegbar = [...document.querySelectorAll("[data-verf]:checked")].map(c => c.dataset.verf);
+      const user = await geraeteLogin();
       const batch = writeBatch(db);
       const hRef = doc(collection(db, COL_HELFER));
       batch.set(hRef, { vorname, name, tel, mail: $("fMail").value.trim(), verein: vereinWert("vereinBox"),

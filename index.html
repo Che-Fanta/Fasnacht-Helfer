@@ -842,9 +842,10 @@
       ...Object.entries(dashboardDaten(false)).sort((a, b) => b[1].stunden - a[1].stunden)
         .map(([v, d]) => [v, d.helfer, Math.round(d.einsaetze * 10) / 10, Math.round(d.stunden * 10) / 10])], [24, 10, 10, 10]);
 
-    blatt("Helfer", [["Vorname", "Name", "Telefon", "E-Mail", "Verein", "Einsätze", "Zusätzlich verfügbar", "Bemerkung"],
-      ...helferZeilen().map(h => [h.vorname, h.name, h.tel, h.mail, h.verein, h.einsaetze.map(einsatzText).join("\n"), verfText(h.verfuegbar), h.bemerkung])],
-      [14, 16, 16, 26, 16, 60, 26, 30]);
+    blatt("Helfer", [["Vorname", "Name", "Telefon", "E-Mail", "Verein", "Anzahl Einsätze", "Stunden", "Einsätze", "Zusätzlich verfügbar", "Bemerkung"],
+      ...helferZeilen().map(h => [h.vorname, h.name, h.tel, h.mail, h.verein, h.einsaetze.length, h.einsaetze.reduce((n, s) => n + stundenVon(s), 0),
+        h.einsaetze.map(einsatzText).join("\n"), verfText(h.verfuegbar), h.bemerkung])],
+      [14, 16, 16, 26, 16, 10, 9, 60, 26, 30]);
 
     XLSX.writeFile(wb, `Helferliste_Fasnacht_${JAHR}.xlsx`);
   }

@@ -790,7 +790,7 @@
 
   function renderHelferTabelle() {
     const z = helferZeilen();
-    $("adminHelfer").innerHTML = z.length ? `<table><tr><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Verein</th><th>Einsätze</th><th>Zusätzlich verfügbar</th><th>Bemerkung</th><th></th></tr>` +
+    $("adminHelfer").innerHTML = z.length ? `<table><tr><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Verein</th><th>Anzahl</th><th>Stunden</th><th>Einsätze</th><th>Zusätzlich verfügbar</th><th>Bemerkung</th><th></th></tr>` +
       z.map(h => `<tr><td>${esc(h.vorname)} ${esc(h.name)}${z.filter(x => norm(x.vorname + " " + x.name) === norm(h.vorname + " " + h.name)).length > 1 ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td><td>${esc(h.tel)}</td><td>${esc(h.mail)}</td><td>${esc(h.verein)}</td>
         <td>${h.einsaetze.map(s => esc(einsatzText(s))).join("<br>") || "<span class='muted'>–</span>"}</td>
         <td>${esc(verfText(h.verfuegbar))}</td><td>${esc(h.bemerkung)}</td>

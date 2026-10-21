@@ -353,6 +353,9 @@
     `<tr><td style="text-align:left;">${esc(tagLabel(t))}</td>
      <td><input type="checkbox" data-verf="${t}_V"/></td><td><input type="checkbox" data-verf="${t}_N"/></td></tr>`).join("");
 
+  $("vereinBox").innerHTML = VEREINE.map(v =>
+    `<label style="margin-top:0.3rem;"><input type="checkbox" data-verein="${esc(v)}"/> ${esc(v)}</label>`).join("");
+
   async function oeffneHelfer() {
     zeigeView("helferView");
     $("helferSchichten").textContent = "Lade Einsätze…";

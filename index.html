@@ -825,6 +825,8 @@
     } catch (err) { console.error(err); okMitglieder = []; }
     if (!okMitglieder.some(m => m.mail === HAUPT_ADMIN)) okMitglieder.unshift({ mail: HAUPT_ADMIN, passwort: "", erstellt: "" });
   }
+  // "mails" wird von den Firestore-Regeln geprüft: nur diese Logins sind OK
+  const speichereOk = liste => setDoc(okRef, { liste, mails: liste.map(m => m.mail) });
   async function renderOkListe() {
     await ladeOk();
     $("okListe").innerHTML = `<table><tr><th>E-Mail</th><th>Passwort</th><th>Hinzugefügt</th><th></th></tr>` +

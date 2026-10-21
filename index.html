@@ -683,8 +683,10 @@
         <td style="text-align:center;"><input type="checkbox" data-f="offen" ${s.nurOK ? "" : "checked"}/></td>
         <td><button class="small danger" data-sdel="${s.id}">✕</button></td></tr>`).join("") + "</table>" : "";
     $("adminSchichten").querySelectorAll("input[data-f]").forEach(inp => inp.addEventListener("change", async () => {
-      const sid = inp.closest("tr").dataset.row, f = inp.dataset.f;
-      const wert = f === "bedarf" ? Number(inp.value) : inp.value.trim();
+      const sid = inp.closest("tr").dataset.row;
+      // Checkbox "Selbstanmeldung" wird als nurOK (umgekehrt) gespeichert
+      const f = inp.dataset.f === "offen" ? "nurOK" : inp.dataset.f;
+      const wert = f === "nurOK" ? !inp.checked : f === "bedarf" ? Number(inp.value) : inp.value.trim();
       await updateDoc(configRef, { [`schichten.${sid}.${f}`]: wert });
       schichten.find(s => s.id === sid)[f] = wert;
       $("schichtStatus").textContent = "Gespeichert.";

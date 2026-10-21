@@ -840,7 +840,7 @@
   $("nhSpeichern").addEventListener("click", async () => {
     const h = { vorname: $("nhVorname").value.trim(), name: $("nhName").value.trim(), tel: $("nhTel").value.trim(),
       mail: $("nhMail").value.trim(), verein: vereinWert("nhVereinBox"), verfuegbar: [],
-      bemerkung: $("nhBemerkung").value.trim() || "durch OK erfasst", erstellt: serverTimestamp() };
+      bemerkung: $("nhBemerkung").value.trim(), quelle: "ok", erstellt: serverTimestamp() };
     if (!h.vorname || !h.name || !h.tel) { $("nhStatus").textContent = "Bitte Vorname, Name und Telefon ausfüllen."; return; }
     if (!h.verein) { $("nhStatus").textContent = "Bitte Verein / Gruppe wählen (oder «Keine»)."; return; }
     $("nhSpeichern").disabled = true;

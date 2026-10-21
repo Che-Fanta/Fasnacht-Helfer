@@ -4,7 +4,11 @@ rules_version = '2';
 // OK (Login E-Mail/Passwort): alles.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function istOK() { return request.auth != null; }
+    // OK = eingeloggt UND E-Mail in der OK-Liste (Tab "OK-Mitglieder") bzw. Haupt-Admin
+    function istOK() {
+      return request.auth != null && (request.auth.token.email == 'peterbrunner426@hotmail.com'
+        || request.auth.token.email in get(/databases/$(database)/documents/Fasnacht_ok/mitglieder).data.get('mails', []));
+    }
     // Anmeldung global offen UND Einsatz nicht auf "nur OK" gestellt
     function anmeldungErlaubt(jahrCol, sid) {
       let cfg = get(/databases/$(database)/documents/$(jahrCol)/config).data;

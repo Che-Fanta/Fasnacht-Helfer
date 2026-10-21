@@ -618,17 +618,43 @@
     }));
   }
 
-  $("btnCsv").addEventListener("click", () => {
-    const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const rows = [["Tag", "Bereich", "Aufgabe", "Zeit", "Verantwortlich", "Vorname", "Name", "Telefon", "E-Mail", "Verein", "Status"]];
-    schichten.forEach(s => eintraegeVon(s.id).forEach(e => { const h = helfer[e.helferId] || {};
-      rows.push([tagLabel(s.tag), s.bereich, s.aufgabe, s.zeit, s.verantwortlich, h.vorname || e.name, h.name || "", h.tel, h.mail, h.verein, e.status]); }));
-    const csv = "﻿" + rows.map(r => r.map(q).join(";")).join("\r\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    a.download = `Helfereinsaetze_Fasnacht_${JAHR}.csv`;
-    a.click();
-  });
+  // Excel-Export: Blatt "Übersicht", ein Blatt pro Bereich (wie Vorjahres-Excel), Blatt "Helfer"
+  function exportExcel() {
+    const XLSX = window.XLSX;
+    if (!XLSX) { alert("Excel-Bibliothek nicht geladen. Bitte Seite neu laden."); return; }
+    const wb = XLSX.utils.book_new();
+    const status = e => e.status === "bestaetigt" ? "bestätigt" : "angemeldet";
+    const kopf = ["Tag", "Bereich", "Aufgabe", "Zeit", "Verantwortlich", "Bedarf", "Eingeteilt", "Offen", "Helfer"];
+    const blatt = (name, rows, breiten) => {
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = breiten.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(wb, ws, name.replace(/[\\/?*\[\]:]/g, "").slice(0, 31));
+    };
+    const zeile = s => { const e = eintraegeVon(s.id);
+      return [tagLabel(s.tag), s.bereich, s.aufgabe, s.zeit, s.verantwortlich, s.bedarf, e.length, Math.max(0, s.bedarf - e.length), e.map(x => x.name).join(", ")]; };
+    blatt("Übersicht", [kopf, ...schichten.map(zeile)], [22, 16, 36, 24, 22, 8, 10, 7, 60]);
+
+    [...new Set(schichten.map(s => s.bereich))].forEach(b => {
+      const rows = [[`Fasnacht ${JAHR}`, "", b, "Einsatzplanung"], []];
+      rows.push(["Tag", "Aufgabe", "Zeit", "Verantwortlich", "Vorname", "Name", "Telefon", "Status"]);
+      schichten.filter(s => s.bereich === b).forEach(s => {
+        const e = eintraegeVon(s.id);
+        if (!e.length) rows.push([tagLabel(s.tag), s.aufgabe, s.zeit, s.verantwortlich, "– offen –", "", "", ""]);
+        e.forEach(x => { const h = helfer[x.helferId] || {};
+          rows.push([tagLabel(s.tag), s.aufgabe, s.zeit, s.verantwortlich, h.vorname || x.name, h.name || "", h.tel || "", status(x)]); });
+        for (let i = e.length; i < s.bedarf && e.length; i++) rows.push(["", "", "", "", "– offen –", "", "", ""]);
+      });
+      blatt(b, rows, [22, 36, 24, 22, 14, 16, 16, 12]);
+    });
+
+    blatt("Helfer", [["Vorname", "Name", "Telefon", "E-Mail", "Verein", "Einsätze", "Zusätzlich verfügbar", "Bemerkung"],
+      ...helferZeilen().map(h => [h.vorname, h.name, h.tel, h.mail, h.verein, h.einsaetze.map(einsatzText).join("\n"), verfText(h.verfuegbar), h.bemerkung])],
+      [14, 16, 16, 26, 16, 60, 26, 30]);
+
+    XLSX.writeFile(wb, `Helferliste_Fasnacht_${JAHR}.xlsx`);
+  }
+  $("btnCsv").addEventListener("click", exportExcel);
+  $("btnExcel").addEventListener("click", exportExcel);
 
   // ---- Einsätze verwalten ----
   function renderSchichtVerwaltung() {

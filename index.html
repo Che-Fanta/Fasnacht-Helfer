@@ -671,7 +671,7 @@
     $("importBox").innerHTML = schichten.length ? "" :
       `<p><button id="btnImport">Einsätze aus Vorlage ${JAHR} importieren (${VORLAGE.length} Einsätze aus Excel)</button></p>`;
     if (!schichten.length) $("btnImport").addEventListener("click", importVorlage);
-    $("adminSchichten").innerHTML = schichten.length ? `<table><tr><th>Tag</th><th>Bereich</th><th>Aufgabe</th><th>Zeit</th><th>Bedarf</th><th>Verantwortlich</th><th>Hinweis</th><th></th></tr>` +
+    $("adminSchichten").innerHTML = schichten.length ? `<table><tr><th>Tag</th><th>Bereich</th><th>Aufgabe</th><th>Zeit</th><th>Bedarf</th><th>Verantwortlich</th><th>Hinweis</th><th title="Helfer dürfen sich selbst eintragen">Selbst-<br>anmeldung</th><th></th></tr>` +
       schichten.map(s => `<tr data-row="${s.id}">
         <td>${esc(tagLabel(s.tag).split(" ")[0])}</td>
         <td><input data-f="bereich" value="${esc(s.bereich)}" style="width:110px;"/></td>

@@ -419,7 +419,9 @@
       await ladeEintraege();
       renderHelferSchichten();
       st.className = "ok";
-      st.innerHTML = `<strong>Merci vielmal, ${esc(vorname)}!</strong> Du bist eingetragen für:<ul>${liste.map(l => `<li>${esc(l)}</li>`).join("")}</ul>Das OK meldet sich, falls es Änderungen gibt.`;
+      st.innerHTML = liste.length
+        ? `<strong>Merci vielmal, ${esc(vorname)}!</strong> Du bist eingetragen für:<ul>${liste.map(l => `<li>${esc(l)}</li>`).join("")}</ul>Das OK meldet sich, falls es Änderungen gibt.`
+        : `<strong>Merci vielmal, ${esc(vorname)}!</strong> Das OK meldet sich bei dir für einen Einsatz.`;
     } catch (err) {
       console.error(err);
       st.className = "error"; st.textContent = "Speichern fehlgeschlagen. Bitte später nochmals versuchen.";

@@ -812,6 +812,68 @@
     }).sort((a, b) => `${a.name} ${a.vorname}`.localeCompare(`${b.name} ${b.vorname}`));
   }
   const verfText = v => (v || []).map(x => { const [t, z] = x.split("_"); return `${tagLabel(t).split(" ")[0].slice(0, 2)} ${z === "V" ? "Vorm." : "Nachm."}`; }).join(", ");
+  // ---- OK-Mitglieder ----
+  // Liste in Fasnacht_ok/mitglieder (nur OK lesbar). Neue Logins über eine zweite Firebase-Instanz anlegen,
+  // damit das aktuelle OK-Login nicht ersetzt wird.
+  const okRef = db ? doc(db, "Fasnacht_ok", "mitglieder") : null;
+  const HAUPT_ADMIN = "peterbrunner426@hotmail.com";   // Passwort wird nie gespeichert/angezeigt
+  let okMitglieder = [];   // [{mail, passwort, erstellt}]
+  async function ladeOk() {
+    try {
+      const snap = await getDoc(okRef);
+      okMitglieder = snap.exists() ? (snap.data().liste || []) : [];
+    } catch (err) { console.error(err); okMitglieder = []; }
+    if (!okMitglieder.some(m => m.mail === HAUPT_ADMIN)) okMitglieder.unshift({ mail: HAUPT_ADMIN, passwort: "", erstellt: "" });
+  }
+  async function renderOkListe() {
+    await ladeOk();
+    $("okListe").innerHTML = `<table><tr><th>E-Mail</th><th>Passwort</th><th>Hinzugefügt</th><th></th></tr>` +
+      okMitglieder.map((m, i) => `<tr><td>${esc(m.mail)}</td>
+        <td>${m.mail === HAUPT_ADMIN ? "<span class='muted'>••••••</span>" : esc(m.passwort)}</td>
+        <td>${esc(m.erstellt)}</td>
+        <td>${m.mail === HAUPT_ADMIN ? "" : `<button class="small danger" data-okdel="${i}">Entfernen</button>`}</td></tr>`).join("") + "</table>";
+    $("okListe").querySelectorAll("[data-okdel]").forEach(b => b.addEventListener("click", async () => {
+      const m = okMitglieder[Number(b.dataset.okdel)];
+      if (!confirm(`${m.mail} aus der Liste entfernen?`)) return;
+      okMitglieder.splice(Number(b.dataset.okdel), 1);
+      await setDoc(okRef, { liste: okMitglieder.filter(x => x.mail !== HAUPT_ADMIN) });
+      renderOkListe();
+    }));
+  }
+  $("btnOkNeu").addEventListener("click", async () => {
+    const mail = $("okMail").value.trim().toLowerCase(), pass = $("okPass").value;
+    const st = $("okStatus");
+    if (!mail.includes("@") || pass.length < 6) { st.className = "error"; st.textContent = "Gültige E-Mail und Passwort mit mind. 6 Zeichen eingeben."; return; }
+    $("btnOkNeu").disabled = true;
+    st.className = "muted"; st.textContent = "Wird angelegt…";
+    try {
+      const zweitAuth = getAuth(initializeApp(firebaseConfig, "okAnlegen-" + Date.now()));
+      let hinweis = "";
+      try {
+        await createUserWithEmailAndPassword(zweitAuth, mail, pass);
+      } catch (err) {
+        if (err.code !== "auth/email-already-in-use") throw err;
+        hinweis = " (Login bestand schon – Passwort in Firebase unverändert)";
+      }
+      await signOut(zweitAuth);
+      await ladeOk();
+      const liste = okMitglieder.filter(m => m.mail !== mail && m.mail !== HAUPT_ADMIN);
+      if (mail !== HAUPT_ADMIN) liste.push({ mail, passwort: pass, erstellt: new Date().toLocaleDateString("de-CH") });
+      await setDoc(okRef, { liste });
+      $("okMail").value = ""; $("okPass").value = "";
+      st.className = "ok"; st.textContent = `${mail} wurde als OK-Mitglied hinzugefügt.${hinweis}`;
+      renderOkListe();
+    } catch (err) {
+      console.error(err);
+      st.className = "error";
+      st.textContent = err.code === "auth/invalid-email" ? "Ungültige E-Mail-Adresse."
+        : err.code === "auth/weak-password" ? "Passwort zu schwach (mind. 6 Zeichen)."
+        : "Anlegen fehlgeschlagen: " + (err.code || err.message);
+    } finally {
+      $("btnOkNeu").disabled = false;
+    }
+  });
+
   // ---- Stunden & Dashboard ----
   function schaetzeStunden(zeit) {
     const z = String(zeit || "");

@@ -867,7 +867,7 @@
       const sid = inp.closest("tr").dataset.row;
       // Checkbox "Selbstanmeldung" wird als nurOK (umgekehrt) gespeichert
       const f = inp.dataset.f === "offen" ? "nurOK" : inp.dataset.f;
-      const wert = f === "nurOK" ? !inp.checked : f === "bedarf" ? Number(inp.value) : inp.value.trim();
+      const wert = f === "nurOK" ? !inp.checked : (f === "bedarf" || f === "stunden") ? Number(inp.value) : inp.value.trim();
       await updateDoc(configRef, { [`schichten.${sid}.${f}`]: wert });
       schichten.find(s => s.id === sid)[f] = wert;
       $("schichtStatus").textContent = "Gespeichert.";

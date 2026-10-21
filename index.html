@@ -575,10 +575,13 @@
     await ladeEintraege();
     const treffer = eintraege.filter(e => norm(e.name) === q);
     $("suchResultat").innerHTML = treffer.length
-      ? "<ul>" + treffer.map(e => { const s = schichten.find(x => x.id === e.schichtId);
-          return s ? `<li>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> (${esc(s.zeit)}) ${e.status === "bestaetigt" ? "<span class='ok'>✅ definitiv</span>" : "<span style='color:var(--gelb);font-weight:bold;'>🟡 noch nicht bestätigt</span>"}</li>` : ""; }).join("") + "</ul>" +
-        "<p class='muted'>Abmelden oder ändern geht auf dem Gerät, mit dem du dich angemeldet hast – sonst bitte beim OK melden.</p>"
+      ? treffer.map(e => { const s = schichten.find(x => x.id === e.schichtId);
+          return s ? `<div class="person" style="padding:0.5rem 0;"><span>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> (${esc(s.zeit)})<br>
+            ${e.status === "bestaetigt" ? "<span class='ok'>✅ definitiv</span>" : "<span style='color:var(--gelb);font-weight:bold;'>🟡 noch nicht bestätigt</span>"}</span>
+            ${e.status !== "bestaetigt" ? `<button class="small danger" data-abmelden="${e.id}">Abmelden</button>` : ""}</div>` : ""; }).join("") +
+        "<p class='muted'>Definitive Einsätze: Bist du verhindert, organisier bitte deinen Ersatz selber oder melde dich bei der verantwortlichen Person.</p>"
       : "<p class='muted'>Keine Einsätze unter diesem Namen gefunden.</p>";
+    bindeAbmelden($("suchResultat"), () => $("btnSuchen").click());
   });
 
   // ====================================================================

@@ -147,11 +147,24 @@
     <button id="btnLogoutAdmin" class="secondary small" style="display:none;">Logout</button>
   </div>
   <div class="box" id="adminLoginBox">
-    <h2>OK-Login</h2>
-    <label>E-Mail<input id="adminMail" type="email" autocomplete="username"/></label>
-    <label>Passwort<input id="adminPass" type="password" autocomplete="current-password"/></label>
-    <button id="btnAdminLogin">Login</button>
-    <p class="error" id="adminError"></p>
+    <div id="loginForm">
+      <h2>OK-Login</h2>
+      <label>E-Mail<input id="adminMail" type="email" autocomplete="username"/></label>
+      <label>Passwort<input id="adminPass" type="password" autocomplete="current-password"/></label>
+      <button id="btnAdminLogin">Login</button>
+      <p class="error" id="adminError"></p>
+      <p><a href="#" id="lnkRegistrieren">Noch kein Konto? Registrieren</a> · <a href="#" id="lnkVergessen">Passwort vergessen?</a></p>
+    </div>
+    <div id="regForm" style="display:none;">
+      <h2>Konto erstellen</h2>
+      <p class="muted">Nur für OK-Mitglieder, deren E-Mail im Tool freigeschaltet wurde.</p>
+      <label>E-Mail<input id="regMail" type="email" autocomplete="username"/></label>
+      <label>Passwort (mind. 6 Zeichen)<input id="regPass" type="password" autocomplete="new-password"/></label>
+      <label>Passwort bestätigen<input id="regPass2" type="password" autocomplete="new-password"/></label>
+      <button id="btnRegistrieren">Konto erstellen</button>
+      <p class="error" id="regError"></p>
+      <p><a href="#" id="lnkZumLogin">← Ich habe schon ein Konto</a></p>
+    </div>
   </div>
 
   <div id="adminContent" style="display:none;">

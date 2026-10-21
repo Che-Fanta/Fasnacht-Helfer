@@ -636,8 +636,6 @@
       $("nhSpeichern").disabled = false;
     }
   });
-  {
-  }
   function helferOptionen(sid) {
     const schon = new Set(eintraegeVon(sid).map(e => e.helferId));
     return Object.entries(helfer).filter(([id]) => !schon.has(id))

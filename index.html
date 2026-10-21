@@ -675,7 +675,44 @@
       $("adminError").textContent = "Login fehlgeschlagen – E-Mail oder Passwort falsch.";
     }
   });
+  $("btnRegistrieren").addEventListener("click", async () => {
+    const mail = $("adminMail").value.trim(), pass = $("adminPass").value;
+    $("adminError").textContent = "";
+    if (!mail.includes("@") || pass.length < 6) { $("adminError").textContent = "Oben E-Mail und ein Passwort (mind. 6 Zeichen) eingeben, dann «Konto erstellen» klicken."; return; }
+    try {
+      await createUserWithEmailAndPassword(auth, mail, pass);   // loggt direkt ein
+      $("adminPass").value = "";
+    } catch (err) {
+      $("adminError").textContent = err.code === "auth/email-already-in-use" ? "Für diese E-Mail gibt es schon ein Konto – bitte normal mit «Login» anmelden."
+        : err.code === "auth/weak-password" ? "Passwort zu kurz (mind. 6 Zeichen)."
+        : err.code === "auth/invalid-email" ? "Ungültige E-Mail-Adresse." : "Konto erstellen fehlgeschlagen.";
+    }
+  });
   $("btnLogoutAdmin").addEventListener("click", () => signOut(auth));
+
+  // ---- OK-Zugänge: Liste freigeschalteter E-Mails (Fasnacht_ok/zugang.mails), von den Firestore-Regeln geprüft ----
+  const zugangRef = db ? doc(db, "Fasnacht_ok", "zugang") : null;
+  let okMails = [];
+  $("okLink").textContent = location.origin + location.pathname + "#ok";
+  async function renderOkListe() {
+    try { const snap = await getDoc(zugangRef); okMails = snap.exists() ? (snap.data().mails || []) : []; } catch { okMails = []; }
+    const ich = (auth.currentUser?.email || "").toLowerCase();
+    $("okListe").innerHTML = okMails.length ? "<table style='max-width:520px;'><tr><th>Freigeschaltete E-Mail</th><th></th></tr>" +
+      okMails.map(m => `<tr><td>${esc(m)}</td><td>${m === ich ? "<span class='muted'>(du)</span>" : `<button class="small danger" data-okweg="${esc(m)}">Entfernen</button>`}</td></tr>`).join("") + "</table>" : "";
+    $("okListe").querySelectorAll("[data-okweg]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm(`${b.dataset.okweg} den OK-Zugang entziehen?`)) return;
+      await setDoc(zugangRef, { mails: okMails.filter(m => m !== b.dataset.okweg) });
+      renderOkListe();
+    }));
+  }
+  $("btnOkFrei").addEventListener("click", async () => {
+    const mail = $("okMail").value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { $("okStatus").className = "error"; $("okStatus").textContent = "Bitte gültige E-Mail eingeben."; return; }
+    if (!okMails.includes(mail)) await setDoc(zugangRef, { mails: [...okMails, mail] });
+    $("okMail").value = "";
+    $("okStatus").className = "ok"; $("okStatus").textContent = `${mail} ist freigeschaltet. Link schicken: ${$("okLink").textContent}`;
+    renderOkListe();
+  });
 
   let istAdmin = false;
   async function onAdmin(authUser) {

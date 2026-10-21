@@ -79,6 +79,15 @@
 <div id="helferView">
   <button class="secondary small btnBack">← Startseite</button>
   <div class="box" id="infoBox"></div>
+  <div class="box" id="meineBox" style="display:none; border-left:5px solid var(--blau);">
+    <div class="flex-row">
+      <h2 style="margin:0;">Meine Einsätze</h2>
+      <button id="btnNichtIch" class="secondary small">Nicht <span id="meinName"></span>? Andere Person anmelden</button>
+    </div>
+    <div id="meineListe"></div>
+    <p class="muted">🟡 <strong>noch nicht bestätigt</strong>: Du kannst dich hier selbst abmelden oder unten weitere Einsätze dazunehmen.<br>
+      ✅ <strong>definitiv</strong>: Vom OK bestätigt. Bist du verhindert, organisier bitte deinen Ersatz selber oder melde dich bei der verantwortlichen Person.</p>
+  </div>
   <div class="box">
     <h2>1. Einsätze auswählen</h2>
     <p class="muted">Hake alle Einsätze an, die du übernehmen möchtest. Das OK prüft die Anmeldungen und teilt definitiv ein.</p>

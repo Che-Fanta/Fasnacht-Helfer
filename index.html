@@ -918,7 +918,8 @@
           const e = eintraegeVon(s.id);
           return `<div class="schicht"><div class="info">
               <div class="flex-row"><span><strong>${esc(s.aufgabe)}</strong> <span class="zeit">🕒 ${esc(s.zeit)}${s.hinweis ? " · " + esc(s.hinweis) : ""}${s.nurOK ? " · 🔒 nur OK-Einteilung" : ""}</span></span>
-              <span class="badge ${ampel(e.length, s.bedarf)}">${e.length} / ${s.bedarf}</span></div>
+              <span><span class="noprint muted">effektiv <input type="number" min="0" step="0.25" data-act="eff" data-sid="${s.id}" value="${stundenIst(s)}" title="Effektive Stunden pro Person (Standard = geplant ${fmtH(stundenVon(s))} h)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h</span>
+              <span class="badge ${ampel(e.length, s.bedarf)}">${e.length} / ${s.bedarf}</span></span></div>
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>
                   <span class="noprint">
@@ -935,6 +936,13 @@
 
     const box = $("adminUebersicht");
     box.querySelectorAll("[data-act=ok]").forEach(b => b.addEventListener("click", () => setEintrag(b.dataset.eid, { status: "bestaetigt" })));
+    box.querySelectorAll("[data-act=eff]").forEach(inp => inp.addEventListener("change", async () => {
+      const sid = inp.dataset.sid, s = schichten.find(x => x.id === sid);
+      const leer = inp.value.trim() === "";
+      await updateDoc(configRef, { [`schichten.${sid}.effStunden`]: leer ? deleteField() : Number(inp.value) });
+      if (leer) delete s.effStunden; else s.effStunden = Number(inp.value);
+      renderAdmin();
+    }));
     box.querySelectorAll("[data-act=del]").forEach(b => b.addEventListener("click", async () => {
       const e = eintraege.find(x => x.id === b.dataset.eid);
       if (!confirm(`${e.name} aus diesem Einsatz entfernen?`)) return;
@@ -1247,7 +1255,7 @@
     $("importBox").innerHTML = schichten.length ? "" :
       `<p><button id="btnImport">Einsätze aus Vorlage ${JAHR} importieren (${VORLAGE.length} Einsätze aus Excel)</button></p>`;
     if (!schichten.length) $("btnImport").addEventListener("click", importVorlage);
-    $("adminSchichten").innerHTML = schichten.length ? `<table><tr><th>Tag</th><th>Bereich</th><th>Aufgabe</th><th>Zeit</th><th>Bedarf</th><th title="Geplante Stunden pro Person">Std.<br>geplant</th><th title="Effektive Stunden, nachträglich eintragen (leer = geplant)">Std.<br>effektiv</th><th>Verantwortlich</th><th>Hinweis</th><th title="Helfer dürfen sich selbst eintragen">Selbst-<br>anmeldung</th><th></th></tr>` +
+    $("adminSchichten").innerHTML = schichten.length ? `<table><tr><th>Tag</th><th>Bereich</th><th>Aufgabe</th><th>Zeit</th><th>Bedarf</th><th title="Geplante Stunden pro Person">Std.<br>geplant</th><th title="Wird unter «Übersicht &amp; Einteilung» eingetragen">Std.<br>effektiv</th><th>Verantwortlich</th><th>Hinweis</th><th title="Helfer dürfen sich selbst eintragen">Selbst-<br>anmeldung</th><th></th></tr>` +
       schichten.map(s => `<tr data-row="${s.id}">
         <td>${esc(tagLabel(s.tag).split(" ")[0])}</td>
         <td><input data-f="bereich" value="${esc(s.bereich)}" style="width:110px;"/></td>
@@ -1255,7 +1263,7 @@
         <td><input data-f="zeit" value="${esc(s.zeit)}" style="width:130px;"/></td>
         <td><input data-f="bedarf" type="number" min="0" value="${s.bedarf}" style="width:60px;"/></td>
         <td><input data-f="stunden" type="number" min="0" step="0.5" value="${stundenVon(s)}" style="width:65px;"/></td>
-        <td><input data-f="effStunden" type="number" min="0" step="0.25" value="${typeof s.effStunden === "number" ? s.effStunden : ""}" style="width:65px;"/></td>
+        <td style="text-align:center;" title="Eintragen unter «Übersicht &amp; Einteilung»">${fmtH(stundenIst(s))}</td>
         <td><input data-f="verantwortlich" value="${esc(s.verantwortlich)}" style="width:140px;"/></td>
         <td><input data-f="hinweis" value="${esc(s.hinweis)}" style="width:140px;"/></td>
         <td style="text-align:center;"><input type="checkbox" data-f="offen" ${s.nurOK ? "" : "checked"}/></td>

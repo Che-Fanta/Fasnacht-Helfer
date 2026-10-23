@@ -923,7 +923,7 @@
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>
                   <span class="noprint">
-                    <input class="eff" type="number" min="0" step="0.25" data-act="eff" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenVon(s)}" title="Effektive Einsatzstunden (leer = geplant ${stundenVon(s)} h)"/> h
+                    <input class="eff" type="number" min="0" step="0.25" data-act="eff" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenIst(s)}" title="Effektive Stunden dieser Person (leer = ${stundenIst(s)} h vom Einsatz)"/> h
                     ${x.status !== "bestaetigt" ? `<button class="small" data-act="ok" data-eid="${x.id}" title="bestätigen">✓</button>` : ""}
                     <select class="small" data-act="move" data-eid="${x.id}" style="width:auto;max-width:200px;font-size:0.8rem;"><option value="">⇄ verschieben…</option>${schichtOptionen(s.id)}</select>
                     <button class="small danger" data-act="del" data-eid="${x.id}" title="entfernen">✕</button>
@@ -1036,7 +1036,8 @@
   }
   const stundenVon = s => (typeof s.stunden === "number" && s.stunden >= 0) ? s.stunden : schaetzeStunden(s.zeit);
   // Effektive Stunden pro Eintrag (vom OK nachgetragen), sonst geplante Stunden des Einsatzes
-  const stundenE = (e, s) => (typeof e?.effStunden === "number" && e.effStunden >= 0) ? e.effStunden : stundenVon(s);
+  const stundenIst = s => (typeof s.effStunden === "number" && s.effStunden >= 0) ? s.effStunden : stundenVon(s);
+  const stundenE = (e, s) => (typeof e?.effStunden === "number" && e.effStunden >= 0) ? e.effStunden : stundenIst(s);
   const vereineVon = h => String(h?.verein || "").split(",").map(v => v.trim()).filter(Boolean);
   const fmtH = n => (Math.round(n * 10) / 10).toLocaleString("de-CH");
 
@@ -1226,7 +1227,7 @@
         const e = eintraegeVon(s.id);
         if (!e.length) rows.push([tagLabel(s.tag), s.aufgabe, s.zeit, s.verantwortlich, "– offen –", "", "", ""]);
         e.forEach(x => { const h = helfer[x.helferId] || {};
-          rows.push([tagLabel(s.tag), s.aufgabe, s.zeit, s.verantwortlich, h.vorname || x.name, h.name || "", h.tel || "", status(x), stundenVon(s), typeof x.effStunden === "number" ? x.effStunden : ""]); });
+          rows.push([tagLabel(s.tag), s.aufgabe, s.zeit, s.verantwortlich, h.vorname || x.name, h.name || "", h.tel || "", status(x), stundenVon(s), stundenE(x, s)]); });
         for (let i = e.length; i < s.bedarf && e.length; i++) rows.push(["", "", "", "", "– offen –", "", "", ""]);
       });
       blatt(b, rows, [22, 36, 24, 22, 14, 16, 16, 12, 11, 11]);
@@ -1252,7 +1253,7 @@
     $("importBox").innerHTML = schichten.length ? "" :
       `<p><button id="btnImport">Einsätze aus Vorlage ${JAHR} importieren (${VORLAGE.length} Einsätze aus Excel)</button></p>`;
     if (!schichten.length) $("btnImport").addEventListener("click", importVorlage);
-    $("adminSchichten").innerHTML = schichten.length ? `<table><tr><th>Tag</th><th>Bereich</th><th>Aufgabe</th><th>Zeit</th><th>Bedarf</th><th title="Stunden pro Person">Std.</th><th>Verantwortlich</th><th>Hinweis</th><th title="Helfer dürfen sich selbst eintragen">Selbst-<br>anmeldung</th><th></th></tr>` +
+    $("adminSchichten").innerHTML = schichten.length ? `<table><tr><th>Tag</th><th>Bereich</th><th>Aufgabe</th><th>Zeit</th><th>Bedarf</th><th title="Geplante Stunden pro Person">Std.<br>geplant</th><th title="Effektive Stunden, nachträglich eintragen (leer = geplant)">Std.<br>effektiv</th><th>Verantwortlich</th><th>Hinweis</th><th title="Helfer dürfen sich selbst eintragen">Selbst-<br>anmeldung</th><th></th></tr>` +
       schichten.map(s => `<tr data-row="${s.id}">
         <td>${esc(tagLabel(s.tag).split(" ")[0])}</td>
         <td><input data-f="bereich" value="${esc(s.bereich)}" style="width:110px;"/></td>
@@ -1260,6 +1261,7 @@
         <td><input data-f="zeit" value="${esc(s.zeit)}" style="width:130px;"/></td>
         <td><input data-f="bedarf" type="number" min="0" value="${s.bedarf}" style="width:60px;"/></td>
         <td><input data-f="stunden" type="number" min="0" step="0.5" value="${stundenVon(s)}" style="width:65px;"/></td>
+        <td><input data-f="effStunden" type="number" min="0" step="0.25" value="${typeof s.effStunden === "number" ? s.effStunden : ""}" placeholder="${stundenVon(s)}" style="width:65px;"/></td>
         <td><input data-f="verantwortlich" value="${esc(s.verantwortlich)}" style="width:140px;"/></td>
         <td><input data-f="hinweis" value="${esc(s.hinweis)}" style="width:140px;"/></td>
         <td style="text-align:center;"><input type="checkbox" data-f="offen" ${s.nurOK ? "" : "checked"}/></td>
@@ -1268,11 +1270,12 @@
       const sid = inp.closest("tr").dataset.row;
       // Checkbox "Selbstanmeldung" wird als nurOK (umgekehrt) gespeichert
       const f = inp.dataset.f === "offen" ? "nurOK" : inp.dataset.f;
-      const wert = f === "nurOK" ? !inp.checked : (f === "bedarf" || f === "stunden") ? Number(inp.value) : inp.value.trim();
-      await updateDoc(configRef, { [`schichten.${sid}.${f}`]: wert });
-      schichten.find(s => s.id === sid)[f] = wert;
+      const leer = f === "effStunden" && inp.value.trim() === "";
+      const wert = f === "nurOK" ? !inp.checked : (f === "bedarf" || f === "stunden" || f === "effStunden") ? Number(inp.value) : inp.value.trim();
+      await updateDoc(configRef, { [`schichten.${sid}.${f}`]: leer ? deleteField() : wert });
+      if (leer) delete schichten.find(s => s.id === sid)[f]; else schichten.find(s => s.id === sid)[f] = wert;
       $("schichtStatus").textContent = "Gespeichert.";
-      renderKpis(); renderUebersicht();
+      renderKpis(); renderUebersicht(); renderDashboard(); renderHelferTabelle();
     }));
     $("adminSchichten").querySelectorAll("[data-sdel]").forEach(b => b.addEventListener("click", async () => {
       if (eintraegeVon(b.dataset.sdel).length) { alert("Es sind noch Helfer eingeteilt. Zuerst verschieben oder entfernen."); return; }

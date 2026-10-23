@@ -918,7 +918,7 @@
           const e = eintraegeVon(s.id);
           return `<div class="schicht"><div class="info">
               <div class="flex-row"><span><strong>${esc(s.aufgabe)}</strong> <span class="zeit">🕒 ${esc(s.zeit)}${s.hinweis ? " · " + esc(s.hinweis) : ""}${s.nurOK ? " · 🔒 nur OK-Einteilung" : ""}</span></span>
-              <span><span class="noprint muted">effektiv <input type="number" min="0" step="0.25" data-act="eff" data-sid="${s.id}" value="${stundenIst(s)}" title="Effektive Stunden pro Person (Standard = geplant ${fmtH(stundenVon(s))} h)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h</span>
+              <span><span class="noprint muted">geplant <strong>${fmtH(stundenVon(s))} h</strong> · effektiv <input type="number" min="0" step="0.25" data-act="eff" data-sid="${s.id}" value="${stundenIst(s)}" title="Effektive Stunden pro Person (Standard = geplant ${fmtH(stundenVon(s))} h)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h</span>
               <span class="badge ${ampel(e.length, s.bedarf)}">${e.length} / ${s.bedarf}</span></span></div>
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>

@@ -70,7 +70,6 @@
   .tabs button { background: #dde3ea; color: var(--blau-dunkel); font-weight: 600; }
   .tabs button.active { background: var(--blau-dunkel); color: white; box-shadow: inset 0 -3px 0 var(--narr); }
   .person { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; padding: 0.2rem 0; border-top: 1px dashed #eee; flex-wrap: wrap; }
-  .eff { width: 60px; font-size: 0.8rem; padding: 0.15rem; }
   .person .neu { color: var(--gelb); font-weight: bold; font-size: 0.75rem; }
   .verf td { text-align: center; }
   #sticky { position: sticky; bottom: 0; background: var(--blau-dunkel); color: white; border-top: 3px solid var(--narr); padding: 0.7rem; box-shadow: 0 -2px 6px rgba(0,0,0,0.15); border-radius: 6px 6px 0 0; display: none; }
@@ -923,7 +922,6 @@
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>
                   <span class="noprint">
-                    <input class="eff" type="number" min="0" step="0.25" data-act="eff" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenIst(s)}" title="Effektive Stunden dieser Person (leer = ${stundenIst(s)} h vom Einsatz)"/> h
                     ${x.status !== "bestaetigt" ? `<button class="small" data-act="ok" data-eid="${x.id}" title="bestätigen">✓</button>` : ""}
                     <select class="small" data-act="move" data-eid="${x.id}" style="width:auto;max-width:200px;font-size:0.8rem;"><option value="">⇄ verschieben…</option>${schichtOptionen(s.id)}</select>
                     <button class="small danger" data-act="del" data-eid="${x.id}" title="entfernen">✕</button>
@@ -937,10 +935,6 @@
 
     const box = $("adminUebersicht");
     box.querySelectorAll("[data-act=ok]").forEach(b => b.addEventListener("click", () => setEintrag(b.dataset.eid, { status: "bestaetigt" })));
-    box.querySelectorAll("[data-act=eff]").forEach(inp => inp.addEventListener("change", () => {
-      const v = inp.value.trim() === "" ? deleteField() : Number(inp.value);
-      setEintrag(inp.dataset.eid, { effStunden: v });
-    }));
     box.querySelectorAll("[data-act=del]").forEach(b => b.addEventListener("click", async () => {
       const e = eintraege.find(x => x.id === b.dataset.eid);
       if (!confirm(`${e.name} aus diesem Einsatz entfernen?`)) return;
@@ -1037,7 +1031,7 @@
   const stundenVon = s => (typeof s.stunden === "number" && s.stunden >= 0) ? s.stunden : schaetzeStunden(s.zeit);
   // Effektive Stunden pro Eintrag (vom OK nachgetragen), sonst geplante Stunden des Einsatzes
   const stundenIst = s => (typeof s.effStunden === "number" && s.effStunden >= 0) ? s.effStunden : stundenVon(s);
-  const stundenE = (e, s) => (typeof e?.effStunden === "number" && e.effStunden >= 0) ? e.effStunden : stundenIst(s);
+  const stundenE = (e, s) => stundenIst(s);
   const vereineVon = h => String(h?.verein || "").split(",").map(v => v.trim()).filter(Boolean);
   const fmtH = n => (Math.round(n * 10) / 10).toLocaleString("de-CH");
 
@@ -1261,7 +1255,7 @@
         <td><input data-f="zeit" value="${esc(s.zeit)}" style="width:130px;"/></td>
         <td><input data-f="bedarf" type="number" min="0" value="${s.bedarf}" style="width:60px;"/></td>
         <td><input data-f="stunden" type="number" min="0" step="0.5" value="${stundenVon(s)}" style="width:65px;"/></td>
-        <td><input data-f="effStunden" type="number" min="0" step="0.25" value="${typeof s.effStunden === "number" ? s.effStunden : ""}" placeholder="${stundenVon(s)}" style="width:65px;"/></td>
+        <td><input data-f="effStunden" type="number" min="0" step="0.25" value="${typeof s.effStunden === "number" ? s.effStunden : ""}" style="width:65px;"/></td>
         <td><input data-f="verantwortlich" value="${esc(s.verantwortlich)}" style="width:140px;"/></td>
         <td><input data-f="hinweis" value="${esc(s.hinweis)}" style="width:140px;"/></td>
         <td style="text-align:center;"><input type="checkbox" data-f="offen" ${s.nurOK ? "" : "checked"}/></td>

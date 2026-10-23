@@ -70,6 +70,7 @@
   .tabs button { background: #dde3ea; color: var(--blau-dunkel); font-weight: 600; }
   .tabs button.active { background: var(--blau-dunkel); color: white; box-shadow: inset 0 -3px 0 var(--narr); }
   .person { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; padding: 0.2rem 0; border-top: 1px dashed #eee; flex-wrap: wrap; }
+  .eff { width: 60px; font-size: 0.8rem; padding: 0.15rem; }
   .person .neu { color: var(--gelb); font-weight: bold; font-size: 0.75rem; }
   .verf td { text-align: center; }
   #sticky { position: sticky; bottom: 0; background: var(--blau-dunkel); color: white; border-top: 3px solid var(--narr); padding: 0.7rem; box-shadow: 0 -2px 6px rgba(0,0,0,0.15); border-radius: 6px 6px 0 0; display: none; }
@@ -414,6 +415,9 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
   const tagLabel = t => (TAGE.find(x => x.id === t) || { label: t }).label;
   const tagIndex = t => TAGE.findIndex(x => x.id === t);
+  // Farbe pro Tag für die OK-Übersicht
+  const TAG_FARBEN = ["#094B92", "#b02a37", "#198754", "#7b3fa0", "#c26a00", "#0f7c8c"];
+  const tagFarbe = t => TAG_FARBEN[Math.max(0, tagIndex(t)) % TAG_FARBEN.length];
   const norm = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
   $("jahrHinweis").textContent = `Helfer-Einsätze Fasnacht ${JAHR}`;
@@ -909,7 +913,7 @@
     const liste = schichten.filter(s => (!ft || s.tag === ft) && (!fb || s.bereich === fb) && (!fo || eintraegeVon(s.id).length < s.bedarf));
     if (!schichten.length) { $("adminUebersicht").innerHTML = "<p>Noch keine Einsätze. Unter <strong>Einsätze verwalten</strong> die Vorlage importieren.</p>"; return; }
     $("adminUebersicht").innerHTML = gruppiert(liste).map(g =>
-      `<details open><summary>${esc(g.tag.label)}</summary><div>` +
+      `<details open style="border-color:${tagFarbe(g.tag.id)};"><summary style="background:${tagFarbe(g.tag.id)};">${esc(g.tag.label)}</summary><div style="background:${tagFarbe(g.tag.id)}14;">` +
       g.bereiche.map(b => `<h3>${esc(b.name)} <span class="muted">– Verantwortlich: ${esc([...new Set(b.schichten.map(s => s.verantwortlich))].join(", "))}</span></h3>` +
         b.schichten.map(s => {
           const e = eintraegeVon(s.id);
@@ -919,6 +923,7 @@
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>
                   <span class="noprint">
+                    <input class="eff" type="number" min="0" step="0.25" data-act="eff" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenVon(s)}" title="Effektive Einsatzstunden (leer = geplant ${stundenVon(s)} h)"/> h
                     ${x.status !== "bestaetigt" ? `<button class="small" data-act="ok" data-eid="${x.id}" title="bestätigen">✓</button>` : ""}
                     <select class="small" data-act="move" data-eid="${x.id}" style="width:auto;max-width:200px;font-size:0.8rem;"><option value="">⇄ verschieben…</option>${schichtOptionen(s.id)}</select>
                     <button class="small danger" data-act="del" data-eid="${x.id}" title="entfernen">✕</button>
@@ -932,6 +937,10 @@
 
     const box = $("adminUebersicht");
     box.querySelectorAll("[data-act=ok]").forEach(b => b.addEventListener("click", () => setEintrag(b.dataset.eid, { status: "bestaetigt" })));
+    box.querySelectorAll("[data-act=eff]").forEach(inp => inp.addEventListener("change", () => {
+      const v = inp.value.trim() === "" ? deleteField() : Number(inp.value);
+      setEintrag(inp.dataset.eid, { effStunden: v });
+    }));
     box.querySelectorAll("[data-act=del]").forEach(b => b.addEventListener("click", async () => {
       const e = eintraege.find(x => x.id === b.dataset.eid);
       if (!confirm(`${e.name} aus diesem Einsatz entfernen?`)) return;
@@ -1007,9 +1016,10 @@
   function helferZeilen() {
     return Object.entries(helfer).map(([id, h]) => {
       const eig = eintraege.filter(e => e.helferId === id).map(e => ({ e, s: schichten.find(s => s.id === e.schichtId) })).filter(x => x.s);
-      const best = eig.filter(x => x.e.status === "bestaetigt").map(x => x.s);
+      const bestE = eig.filter(x => x.e.status === "bestaetigt");
+      const best = bestE.map(x => x.s);
       // einsaetze = alle (inkl. unbestätigt), bestaetigt = nur vom OK bestätigt (zählt für Anzahl/Stunden)
-      return { id, ...h, einsaetze: eig.map(x => x.s), alle: eig, bestaetigt: best, stunden: best.reduce((n, s) => n + stundenVon(s), 0) };
+      return { id, ...h, einsaetze: eig.map(x => x.s), alle: eig, bestaetigt: best, stunden: bestE.reduce((n, x) => n + stundenE(x.e, x.s), 0) };
     }).sort((a, b) => `${a.name} ${a.vorname}`.localeCompare(`${b.name} ${b.vorname}`));
   }
   const verfText = v => (v || []).map(x => { const [t, z] = x.split("_"); return `${tagLabel(t).split(" ")[0].slice(0, 2)} ${z === "V" ? "Vorm." : "Nachm."}`; }).join(", ");
@@ -1025,6 +1035,8 @@
     return 4;                                                // Vormittag, Nachmittag, "ab 17:00" usw.
   }
   const stundenVon = s => (typeof s.stunden === "number" && s.stunden >= 0) ? s.stunden : schaetzeStunden(s.zeit);
+  // Effektive Stunden pro Eintrag (vom OK nachgetragen), sonst geplante Stunden des Einsatzes
+  const stundenE = (e, s) => (typeof e?.effStunden === "number" && e.effStunden >= 0) ? e.effStunden : stundenVon(s);
   const vereineVon = h => String(h?.verein || "").split(",").map(v => v.trim()).filter(Boolean);
   const fmtH = n => (Math.round(n * 10) / 10).toLocaleString("de-CH");
 
@@ -1035,7 +1047,7 @@
     eintraege.filter(e => !nurBest || e.status === "bestaetigt").forEach(e => {
       const s = schichten.find(x => x.id === e.schichtId); if (!s) return;
       const vs = vereineVon(helfer[e.helferId]); const liste = vs.length ? vs : ["(ohne Angabe)"];
-      liste.forEach(v => { add(v, "einsaetze", 1 / liste.length); add(v, "stunden", stundenVon(s) / liste.length); });
+      liste.forEach(v => { add(v, "einsaetze", 1 / liste.length); add(v, "stunden", stundenE(e, s) / liste.length); });
     });
     return proVerein;
   }
@@ -1049,7 +1061,7 @@
     const nurBest = $("dashNurBest").checked;
     const zaehlt = e => !nurBest || e.status === "bestaetigt";
     const bedarfH = schichten.reduce((n, s) => n + s.bedarf * stundenVon(s), 0);
-    const besetztH = eintraege.filter(zaehlt).reduce((n, e) => { const s = schichten.find(x => x.id === e.schichtId); return n + (s ? stundenVon(s) : 0); }, 0);
+    const besetztH = eintraege.filter(zaehlt).reduce((n, e) => { const s = schichten.find(x => x.id === e.schichtId); return n + (s ? stundenE(e, s) : 0); }, 0);
     const pv = dashboardDaten(nurBest);
     const vereine = Object.entries(pv).sort((a, b) => b[1].stunden - a[1].stunden);
     const maxH = Math.max(0, ...vereine.map(([, d]) => d.stunden));
@@ -1058,7 +1070,7 @@
       const sch = schichten.filter(s => s.bereich === b);
       const bed = sch.reduce((n, s) => n + Number(s.bedarf), 0);
       const bes = sch.reduce((n, s) => n + Math.min(eintraegeVon(s.id).filter(zaehlt).length, s.bedarf), 0);
-      const h = sch.reduce((n, s) => n + eintraegeVon(s.id).filter(zaehlt).length * stundenVon(s), 0);
+      const h = sch.reduce((n, s) => n + eintraegeVon(s.id).filter(zaehlt).reduce((m, e) => m + stundenE(e, s), 0), 0);
       return { b, bed, bes, h };
     });
     const tage = TAGE.map(t => {
@@ -1209,15 +1221,15 @@
 
     [...new Set(schichten.map(s => s.bereich))].forEach(b => {
       const rows = [[`Fasnacht ${JAHR}`, "", b, "Einsatzplanung"], []];
-      rows.push(["Tag", "Aufgabe", "Zeit", "Verantwortlich", "Vorname", "Name", "Telefon", "Status"]);
+      rows.push(["Tag", "Aufgabe", "Zeit", "Verantwortlich", "Vorname", "Name", "Telefon", "Status", "Std. geplant", "Std. effektiv"]);
       schichten.filter(s => s.bereich === b).forEach(s => {
         const e = eintraegeVon(s.id);
         if (!e.length) rows.push([tagLabel(s.tag), s.aufgabe, s.zeit, s.verantwortlich, "– offen –", "", "", ""]);
         e.forEach(x => { const h = helfer[x.helferId] || {};
-          rows.push([tagLabel(s.tag), s.aufgabe, s.zeit, s.verantwortlich, h.vorname || x.name, h.name || "", h.tel || "", status(x)]); });
+          rows.push([tagLabel(s.tag), s.aufgabe, s.zeit, s.verantwortlich, h.vorname || x.name, h.name || "", h.tel || "", status(x), stundenVon(s), typeof x.effStunden === "number" ? x.effStunden : ""]); });
         for (let i = e.length; i < s.bedarf && e.length; i++) rows.push(["", "", "", "", "– offen –", "", "", ""]);
       });
-      blatt(b, rows, [22, 36, 24, 22, 14, 16, 16, 12]);
+      blatt(b, rows, [22, 36, 24, 22, 14, 16, 16, 12, 11, 11]);
     });
 
     blatt("Vereine", [["Verein / Gruppe", "Helfer", "Einsätze", "Stunden"],

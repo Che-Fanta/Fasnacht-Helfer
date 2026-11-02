@@ -193,7 +193,7 @@
         <label style="margin:0;"><input type="checkbox" id="dashNurBest"/> nur bestätigte Einsätze zählen</label>
       </div>
       <div id="adminDashboard"></div>
-      <p class="muted">Stunden pro Einsatz: im Tab «Einsätze verwalten» anpassbar (Standard aus der Zeitangabe geschätzt, «Schluss» = 02:00, Vormittag/Nachmittag = 4 Std.). Effektive Stunden pro Einsatz: im Tab «Übersicht &amp; Einteilung». Gesamtstunden pro Helfer: in der Helferliste (zählt bei Vereinen und «Stunden geleistet», nicht pro Bereich/Tag).
+      <p class="muted">Stunden pro Einsatz: im Tab «Einsätze verwalten» anpassbar (Standard aus der Zeitangabe geschätzt, «Schluss» = 02:00, Vormittag/Nachmittag = 4 Std.). Effektive Stunden pro Einsatz: im Tab «Übersicht &amp; Einteilung». Stunden manuell pro Helfer: in der Helferliste (zählt bei Vereinen und «Stunden geleistet», nicht pro Bereich/Tag).
         Wer mehreren Vereinen angehört, wird anteilig auf die Vereine verteilt.</p>
     </div>
 
@@ -1175,7 +1175,7 @@
     const { key, dir } = sortierung[pf];
     const wert = h => ({
       vorname: norm(h.vorname), name: norm(h.name) + " " + norm(h.vorname), tel: h.tel || "", mail: norm(h.mail), verein: norm(h.verein),
-      anzahl: h.bestaetigt.length, stunden: h.stunden, einsaetze: h.alle.length, bemerkung: norm(h.bemerkung),
+      anzahl: h.bestaetigt.length, stunden: h.stundenEinsaetze, manuell: h.stundenGesamt ?? -1, einsaetze: h.alle.length, bemerkung: norm(h.bemerkung),
       erstellt: h.erstellt?.seconds || 0, gewaehlt: (h.angemeldetFuer || []).length,
     })[key];
     return helferZeilen().filter(h => {
@@ -1198,7 +1198,7 @@
     box.querySelectorAll("th[data-sort]").forEach(th => th.addEventListener("click", () => {
       const s = sortierung[pf];
       if (s.key === th.dataset.sort) s.dir *= -1;
-      else { s.key = th.dataset.sort; s.dir = ["anzahl", "stunden", "einsaetze", "erstellt", "gewaehlt"].includes(s.key) ? -1 : 1; }
+      else { s.key = th.dataset.sort; s.dir = ["anzahl", "stunden", "manuell", "einsaetze", "erstellt", "gewaehlt"].includes(s.key) ? -1 : 1; }
       render();
     }));
   }
@@ -1232,12 +1232,13 @@
     $("hlAnzahl").textContent = `${z.length} von ${alle.length}`;
     $("adminHelfer").innerHTML = alle.length ? `<table>` +
       kopf("hl", [["vorname", "Vorname"], ["name", "Name"], ["tel", "Telefon"], ["mail", "E-Mail"], ["verein", "Verein"],
-        ["anzahl", "Anzahl ✅", "nur bestätigte"], ["stunden", "Stunden ✅", "Summe der bestätigten Einsätze, hier für den Helfer anpassbar"], ["einsaetze", "Einsätze"],
+        ["anzahl", "Anzahl ✅", "nur bestätigte"], ["stunden", "Stunden ✅", "Berechnet: Summe der bestätigten Einsätze"], ["manuell", "Stunden manuell", "Überschreibt die berechneten Stunden, leer = berechneter Wert zählt"], ["einsaetze", "Einsätze"],
         ["bemerkung", "Bemerkung"], [null, ""]]) +
       z.map(h => `<tr><td class="fix">${esc(h.vorname)}</td><td>${esc(h.name)}${doppelt(h) ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td>
         <td class="nowrap">${esc(h.tel)}</td><td class="klein">${esc(h.mail)}</td><td>${esc(h.verein)}</td>
         <td style="text-align:center;">${h.bestaetigt.length}</td>
-        <td style="text-align:right; white-space:nowrap;"><input type="number" min="0" step="0.25" data-hstd="${h.id}" value="${typeof h.stundenGesamt === "number" ? h.stundenGesamt : ""}" placeholder="${h.stundenEinsaetze}" title="Gesamtstunden von ${esc(h.vorname)} ${esc(h.name)} (leer = Summe der Einsätze: ${fmtH(h.stundenEinsaetze)} h)" style="width:70px;font-size:0.85rem;padding:0.15rem;"/> h</td>
+        <td style="text-align:right; white-space:nowrap;"><strong>${fmtH(h.stundenEinsaetze)} h</strong></td>
+        <td style="text-align:right; white-space:nowrap;"><input type="number" min="0" step="0.25" data-hstd="${h.id}" value="${typeof h.stundenGesamt === "number" ? h.stundenGesamt : ""}" title="Gesamtstunden von ${esc(h.vorname)} ${esc(h.name)} manuell festlegen (leer = berechnete ${fmtH(h.stundenEinsaetze)} h zählen)" style="width:70px;font-size:0.85rem;padding:0.15rem;"/> h</td>
         <td class="klein" style="min-width:260px;">${einsatzListe(h)}</td><td class="klein">${esc(h.bemerkung)}</td>
         <td><button class="small danger" data-hdel="${h.id}">Löschen</button></td></tr>`).join("") + "</table>" + (z.length ? "" : "<p class='muted'>Keine Treffer für diesen Filter.</p>")
       : "<p class='muted'>Noch keine Anmeldungen.</p>";
@@ -1302,10 +1303,10 @@
       ...Object.entries(dashboardDaten(false)).sort((a, b) => b[1].stunden - a[1].stunden)
         .map(([v, d]) => [v, d.helfer, Math.round(d.einsaetze * 10) / 10, Math.round(d.stunden * 10) / 10])], [24, 10, 10, 10]);
 
-    blatt("Helfer", [["Vorname", "Name", "Telefon", "E-Mail", "Verein", "Anzahl Einsätze (bestätigt)", "Stunden (bestätigt)", "Einsätze", "Bemerkung"],
-      ...helferZeilen().map(h => [h.vorname, h.name, h.tel, h.mail, h.verein, h.bestaetigt.length, h.stunden,
+    blatt("Helfer", [["Vorname", "Name", "Telefon", "E-Mail", "Verein", "Anzahl Einsätze (bestätigt)", "Stunden berechnet (bestätigt)", "Stunden manuell", "Stunden gültig", "Einsätze", "Bemerkung"],
+      ...helferZeilen().map(h => [h.vorname, h.name, h.tel, h.mail, h.verein, h.bestaetigt.length, h.stundenEinsaetze, h.stundenGesamt ?? "", h.stunden,
         h.einsaetze.map(einsatzText).join("\n"), h.bemerkung])],
-      [14, 16, 16, 26, 16, 10, 9, 60, 30]);
+      [14, 16, 16, 26, 16, 10, 10, 9, 9, 60, 30]);
 
     XLSX.writeFile(wb, `Helferliste_Fasnacht_${JAHR}.xlsx`);
   }

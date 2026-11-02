@@ -193,7 +193,7 @@
         <label style="margin:0;"><input type="checkbox" id="dashNurBest"/> nur bestätigte Einsätze zählen</label>
       </div>
       <div id="adminDashboard"></div>
-      <p class="muted">Stunden pro Einsatz: im Tab «Einsätze verwalten» anpassbar (Standard aus der Zeitangabe geschätzt, «Schluss» = 02:00, Vormittag/Nachmittag = 4 Std.). Effektive Stunden pro Einsatz oder pro Helfer: im Tab «Übersicht &amp; Einteilung».
+      <p class="muted">Stunden pro Einsatz: im Tab «Einsätze verwalten» anpassbar (Standard aus der Zeitangabe geschätzt, «Schluss» = 02:00, Vormittag/Nachmittag = 4 Std.). Effektive Stunden pro Einsatz: im Tab «Übersicht &amp; Einteilung», pro Helfer: dort oder in der Helferliste.
         Wer mehreren Vereinen angehört, wird anteilig auf die Vereine verteilt.</p>
     </div>
 
@@ -938,7 +938,7 @@
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>
                   <span class="noprint">
-                    <input type="number" min="0" step="0.25" data-act="effh" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenIst(s)}" title="Effektive Stunden von ${esc(x.name)} (leer = Wert des Einsatzes)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h
+                    ${effHelferFeld(x, s)}
                     ${x.status !== "bestaetigt" ? `<button class="small" data-act="ok" data-eid="${x.id}" title="bestätigen">✓</button>` : ""}
                     <select class="small" data-act="move" data-eid="${x.id}" style="width:auto;max-width:200px;font-size:0.8rem;"><option value="">⇄ verschieben…</option>${schichtOptionen(s.id)}</select>
                     <button class="small danger" data-act="del" data-eid="${x.id}" title="entfernen">✕</button>
@@ -959,22 +959,7 @@
       if (leer) delete s.effStunden; else s.effStunden = Number(inp.value);
       renderAdmin();
     }));
-    box.querySelectorAll("[data-act=effh]").forEach(inp => inp.addEventListener("change", async () => {
-      const e = eintraege.find(x => x.id === inp.dataset.eid);
-      const wert = inp.value.trim() === "" ? null : Number(inp.value);
-      if (wert !== null && !(wert >= 0)) { alert("Bitte eine Stundenzahl ab 0 eingeben."); inp.value = e.effStunden ?? ""; return; }
-      try {
-        await updateDoc(doc(db, COL_EINTRAEGE, e.id), { effStunden: wert === null ? deleteField() : wert });
-      } catch (err) {
-        console.error(err);
-        alert(`Stunden von ${e.name} konnten nicht gespeichert werden.`);
-        inp.value = e.effStunden ?? "";
-        return;
-      }
-      if (wert === null) delete e.effStunden; else e.effStunden = wert;
-      // Übersicht nicht neu aufbauen, damit man mit Tab zum nächsten Helfer weiterfahren kann
-      renderKpis(); renderHelferTabelle(); renderDashboard();
-    }));
+    bindeEffHelfer(box, () => { renderKpis(); renderHelferTabelle(); renderDashboard(); });
     box.querySelectorAll("[data-act=del]").forEach(b => b.addEventListener("click", async () => {
       const e = eintraege.find(x => x.id === b.dataset.eid);
       if (!confirm(`${e.name} aus diesem Einsatz entfernen?`)) return;
@@ -994,6 +979,27 @@
       neuerEintrag(sel.dataset.sid, sel.value, `${h.vorname} ${h.name}`);
     }));
     box.querySelectorAll("[data-act=addneu]").forEach(b => b.addEventListener("click", () => oeffneNeuDialog(b.dataset.sid)));
+  }
+
+  // Stundenfeld pro Helfer (Übersicht + Helferliste). Die aktuelle Liste wird nicht neu aufgebaut,
+  // damit man mit Tab zum nächsten Feld weiterfahren kann; das erledigt nachher() für die übrigen Ansichten.
+  const effHelferFeld = (x, s) => `<input type="number" min="0" step="0.25" data-act="effh" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenIst(s)}" title="Effektive Stunden von ${esc(x.name)} (leer = Wert des Einsatzes)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h`;
+  function bindeEffHelfer(box, nachher) {
+    box.querySelectorAll("[data-act=effh]").forEach(inp => inp.addEventListener("change", async () => {
+      const e = eintraege.find(x => x.id === inp.dataset.eid);
+      const wert = inp.value.trim() === "" ? null : Number(inp.value);
+      if (wert !== null && !(wert >= 0)) { alert("Bitte eine Stundenzahl ab 0 eingeben."); inp.value = e.effStunden ?? ""; return; }
+      try {
+        await updateDoc(doc(db, COL_EINTRAEGE, e.id), { effStunden: wert === null ? deleteField() : wert });
+      } catch (err) {
+        console.error(err);
+        alert(`Stunden von ${e.name} konnten nicht gespeichert werden.`);
+        inp.value = e.effStunden ?? "";
+        return;
+      }
+      if (wert === null) delete e.effStunden; else e.effStunden = wert;
+      nachher(e, inp);
+    }));
   }
 
   let neuSchichtId = null;
@@ -1196,6 +1202,8 @@
   });
   const einsatzListe = h => h.alle.map(({ e, s }) => `${e.status === "bestaetigt" ? "✅" : "🟡"} ${esc(einsatzText(s))}`).join("<br>") || "<span class='muted'>–</span>";
 
+  const einsatzListeStunden = h => h.alle.map(({ e, s }) => `<div class="flex-row" style="flex-wrap:nowrap;margin-bottom:0.15rem;"><span>${e.status === "bestaetigt" ? "✅" : "🟡"} ${esc(einsatzText(s))}</span><span class="nowrap">${effHelferFeld(e, s)}</span></div>`).join("") || "<span class='muted'>–</span>";
+
   function renderAnmeldungen() {
     const z = gefiltert("an");
     $("anAnzahl").textContent = `${z.length} von ${Object.keys(helfer).length}`;
@@ -1224,11 +1232,15 @@
       z.map(h => `<tr><td class="fix">${esc(h.vorname)}</td><td>${esc(h.name)}${doppelt(h) ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td>
         <td class="nowrap">${esc(h.tel)}</td><td class="klein">${esc(h.mail)}</td><td>${esc(h.verein)}</td>
         <td style="text-align:center;">${h.bestaetigt.length}</td>
-        <td style="text-align:right; white-space:nowrap;"><strong>${fmtH(h.stunden)} h</strong></td>
-        <td class="klein" style="min-width:260px;">${einsatzListe(h)}</td><td class="klein">${esc(h.bemerkung)}</td>
+        <td style="text-align:right; white-space:nowrap;"><strong data-stunden>${fmtH(h.stunden)} h</strong></td>
+        <td class="klein" style="min-width:360px;">${einsatzListeStunden(h)}</td><td class="klein">${esc(h.bemerkung)}</td>
         <td><button class="small danger" data-hdel="${h.id}">Löschen</button></td></tr>`).join("") + "</table>" + (z.length ? "" : "<p class='muted'>Keine Treffer für diesen Filter.</p>")
       : "<p class='muted'>Noch keine Anmeldungen.</p>";
     bindeSortierung("hl", $("adminHelfer"), renderHelferTabelle);
+    bindeEffHelfer($("adminHelfer"), (e, inp) => {
+      inp.closest("tr").querySelector("[data-stunden]").textContent = `${fmtH(helferZeilen().find(h => h.id === e.helferId).stunden)} h`;
+      renderKpis(); renderUebersicht(); renderDashboard();
+    });
     $("adminHelfer").querySelectorAll("[data-hdel]").forEach(b => b.addEventListener("click", async () => {
       const h = helfer[b.dataset.hdel];
       if (!confirm(`${h.vorname} ${h.name} inkl. aller Einsätze löschen?`)) return;

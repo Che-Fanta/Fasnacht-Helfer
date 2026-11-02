@@ -193,7 +193,7 @@
         <label style="margin:0;"><input type="checkbox" id="dashNurBest"/> nur bestätigte Einsätze zählen</label>
       </div>
       <div id="adminDashboard"></div>
-      <p class="muted">Stunden pro Einsatz: im Tab «Einsätze verwalten» anpassbar (Standard aus der Zeitangabe geschätzt, «Schluss» = 02:00, Vormittag/Nachmittag = 4 Std.).
+      <p class="muted">Stunden pro Einsatz: im Tab «Einsätze verwalten» anpassbar (Standard aus der Zeitangabe geschätzt, «Schluss» = 02:00, Vormittag/Nachmittag = 4 Std.). Effektive Stunden pro Einsatz oder pro Helfer: im Tab «Übersicht &amp; Einteilung».
         Wer mehreren Vereinen angehört, wird anteilig auf die Vereine verteilt.</p>
     </div>
 
@@ -933,11 +933,12 @@
           const e = eintraegeVon(s.id);
           return `<div class="schicht"><div class="info">
               <div class="flex-row"><span><strong>${esc(s.aufgabe)}</strong> <span class="zeit">🕒 ${esc(s.zeit)}${s.hinweis ? " · " + esc(s.hinweis) : ""}${s.nurOK ? " · 🔒 nur OK-Einteilung" : ""}</span></span>
-              <span><span class="noprint muted">geplant <strong>${fmtH(stundenVon(s))} h</strong> · effektiv <input type="number" min="0" step="0.25" data-act="eff" data-sid="${s.id}" value="${stundenIst(s)}" title="Effektive Stunden pro Person (Standard = geplant ${fmtH(stundenVon(s))} h)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h</span>
+              <span><span class="noprint muted">geplant <strong>${fmtH(stundenVon(s))} h</strong> · effektiv <input type="number" min="0" step="0.25" data-act="eff" data-sid="${s.id}" value="${stundenIst(s)}" title="Effektive Stunden für alle Helfer dieses Einsatzes ohne eigenen Wert (Standard = geplant ${fmtH(stundenVon(s))} h)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h</span>
               <span class="badge ${ampel(e.length, s.bedarf)}">${e.length} / ${s.bedarf}</span></span></div>
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>
                   <span class="noprint">
+                    <input type="number" min="0" step="0.25" data-act="effh" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenIst(s)}" title="Effektive Stunden von ${esc(x.name)} (leer = Wert des Einsatzes)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h
                     ${x.status !== "bestaetigt" ? `<button class="small" data-act="ok" data-eid="${x.id}" title="bestätigen">✓</button>` : ""}
                     <select class="small" data-act="move" data-eid="${x.id}" style="width:auto;max-width:200px;font-size:0.8rem;"><option value="">⇄ verschieben…</option>${schichtOptionen(s.id)}</select>
                     <button class="small danger" data-act="del" data-eid="${x.id}" title="entfernen">✕</button>
@@ -958,6 +959,22 @@
       if (leer) delete s.effStunden; else s.effStunden = Number(inp.value);
       renderAdmin();
     }));
+    box.querySelectorAll("[data-act=effh]").forEach(inp => inp.addEventListener("change", async () => {
+      const e = eintraege.find(x => x.id === inp.dataset.eid);
+      const wert = inp.value.trim() === "" ? null : Number(inp.value);
+      if (wert !== null && !(wert >= 0)) { alert("Bitte eine Stundenzahl ab 0 eingeben."); inp.value = e.effStunden ?? ""; return; }
+      try {
+        await updateDoc(doc(db, COL_EINTRAEGE, e.id), { effStunden: wert === null ? deleteField() : wert });
+      } catch (err) {
+        console.error(err);
+        alert(`Stunden von ${e.name} konnten nicht gespeichert werden.`);
+        inp.value = e.effStunden ?? "";
+        return;
+      }
+      if (wert === null) delete e.effStunden; else e.effStunden = wert;
+      // Übersicht nicht neu aufbauen, damit man mit Tab zum nächsten Helfer weiterfahren kann
+      renderKpis(); renderHelferTabelle(); renderDashboard();
+    }));
     box.querySelectorAll("[data-act=del]").forEach(b => b.addEventListener("click", async () => {
       const e = eintraege.find(x => x.id === b.dataset.eid);
       if (!confirm(`${e.name} aus diesem Einsatz entfernen?`)) return;
@@ -969,7 +986,7 @@
       if (!sel.value) return;
       const e = eintraege.find(x => x.id === sel.dataset.eid);
       if (eintraegeVon(sel.value).some(x => x.helferId === e.helferId)) { alert(`${e.name} ist in diesem Einsatz schon eingeteilt.`); sel.value = ""; return; }
-      setEintrag(sel.dataset.eid, { schichtId: sel.value, status: "bestaetigt" });
+      setEintrag(sel.dataset.eid, { schichtId: sel.value, status: "bestaetigt", effStunden: deleteField() });
     }));
     box.querySelectorAll("[data-act=addsel]").forEach(sel => sel.addEventListener("change", () => {
       if (!sel.value) return;
@@ -1018,7 +1035,9 @@
   }
   async function setEintrag(eid, felder) {
     await updateDoc(doc(db, COL_EINTRAEGE, eid), felder);
-    Object.assign(eintraege.find(x => x.id === eid), felder);
+    const e = eintraege.find(x => x.id === eid);
+    Object.assign(e, felder);
+    if (typeof e.effStunden !== "number") delete e.effStunden;
     renderAdmin();
   }
   async function neuerEintrag(sid, helferId, name) {
@@ -1052,9 +1071,9 @@
     return 4;                                                // Vormittag, Nachmittag, "ab 17:00" usw.
   }
   const stundenVon = s => (typeof s.stunden === "number" && s.stunden >= 0) ? s.stunden : schaetzeStunden(s.zeit);
-  // Effektive Stunden pro Eintrag (vom OK nachgetragen), sonst geplante Stunden des Einsatzes
+  // Effektive Stunden: Wert des Helfers, sonst Wert des Einsatzes, sonst geplante Stunden
   const stundenIst = s => (typeof s.effStunden === "number" && s.effStunden >= 0) ? s.effStunden : stundenVon(s);
-  const stundenE = (e, s) => stundenIst(s);
+  const stundenE = (e, s) => (typeof e.effStunden === "number" && e.effStunden >= 0) ? e.effStunden : stundenIst(s);
   const vereineVon = h => String(h?.verein || "").split(",").map(v => v.trim()).filter(Boolean);
   const fmtH = n => (Math.round(n * 10) / 10).toLocaleString("de-CH");
 

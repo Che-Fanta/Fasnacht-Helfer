@@ -193,7 +193,7 @@
         <label style="margin:0;"><input type="checkbox" id="dashNurBest"/> nur bestätigte Einsätze zählen</label>
       </div>
       <div id="adminDashboard"></div>
-      <p class="muted">Stunden pro Einsatz: im Tab «Einsätze verwalten» anpassbar (Standard aus der Zeitangabe geschätzt, «Schluss» = 02:00, Vormittag/Nachmittag = 4 Std.). Effektive Stunden pro Einsatz: im Tab «Übersicht &amp; Einteilung», pro Helfer: dort oder in der Helferliste.
+      <p class="muted">Stunden pro Einsatz: im Tab «Einsätze verwalten» anpassbar (Standard aus der Zeitangabe geschätzt, «Schluss» = 02:00, Vormittag/Nachmittag = 4 Std.). Effektive Stunden pro Einsatz: im Tab «Übersicht &amp; Einteilung». Gesamtstunden pro Helfer: in der Helferliste (zählt bei Vereinen und «Stunden geleistet», nicht pro Bereich/Tag).
         Wer mehreren Vereinen angehört, wird anteilig auf die Vereine verteilt.</p>
     </div>
 
@@ -938,7 +938,7 @@
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>
                   <span class="noprint">
-                    ${effHelferFeld(x, s)}
+                    <input type="number" min="0" step="0.25" data-act="effh" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenIst(s)}" title="Effektive Stunden von ${esc(x.name)} (leer = Wert des Einsatzes)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h
                     ${x.status !== "bestaetigt" ? `<button class="small" data-act="ok" data-eid="${x.id}" title="bestätigen">✓</button>` : ""}
                     <select class="small" data-act="move" data-eid="${x.id}" style="width:auto;max-width:200px;font-size:0.8rem;"><option value="">⇄ verschieben…</option>${schichtOptionen(s.id)}</select>
                     <button class="small danger" data-act="del" data-eid="${x.id}" title="entfernen">✕</button>
@@ -959,7 +959,22 @@
       if (leer) delete s.effStunden; else s.effStunden = Number(inp.value);
       renderAdmin();
     }));
-    bindeEffHelfer(box, () => { renderKpis(); renderHelferTabelle(); renderDashboard(); });
+    box.querySelectorAll("[data-act=effh]").forEach(inp => inp.addEventListener("change", async () => {
+      const e = eintraege.find(x => x.id === inp.dataset.eid);
+      const wert = inp.value.trim() === "" ? null : Number(inp.value);
+      if (wert !== null && !(wert >= 0)) { alert("Bitte eine Stundenzahl ab 0 eingeben."); inp.value = e.effStunden ?? ""; return; }
+      try {
+        await updateDoc(doc(db, COL_EINTRAEGE, e.id), { effStunden: wert === null ? deleteField() : wert });
+      } catch (err) {
+        console.error(err);
+        alert(`Stunden von ${e.name} konnten nicht gespeichert werden.`);
+        inp.value = e.effStunden ?? "";
+        return;
+      }
+      if (wert === null) delete e.effStunden; else e.effStunden = wert;
+      // Übersicht nicht neu aufbauen, damit man mit Tab zum nächsten Helfer weiterfahren kann
+      renderKpis(); renderHelferTabelle(); renderDashboard();
+    }));
     box.querySelectorAll("[data-act=del]").forEach(b => b.addEventListener("click", async () => {
       const e = eintraege.find(x => x.id === b.dataset.eid);
       if (!confirm(`${e.name} aus diesem Einsatz entfernen?`)) return;
@@ -979,27 +994,6 @@
       neuerEintrag(sel.dataset.sid, sel.value, `${h.vorname} ${h.name}`);
     }));
     box.querySelectorAll("[data-act=addneu]").forEach(b => b.addEventListener("click", () => oeffneNeuDialog(b.dataset.sid)));
-  }
-
-  // Stundenfeld pro Helfer (Übersicht + Helferliste). Die aktuelle Liste wird nicht neu aufgebaut,
-  // damit man mit Tab zum nächsten Feld weiterfahren kann; das erledigt nachher() für die übrigen Ansichten.
-  const effHelferFeld = (x, s) => `<input type="number" min="0" step="0.25" data-act="effh" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenIst(s)}" title="Effektive Stunden von ${esc(x.name)} (leer = Wert des Einsatzes)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h`;
-  function bindeEffHelfer(box, nachher) {
-    box.querySelectorAll("[data-act=effh]").forEach(inp => inp.addEventListener("change", async () => {
-      const e = eintraege.find(x => x.id === inp.dataset.eid);
-      const wert = inp.value.trim() === "" ? null : Number(inp.value);
-      if (wert !== null && !(wert >= 0)) { alert("Bitte eine Stundenzahl ab 0 eingeben."); inp.value = e.effStunden ?? ""; return; }
-      try {
-        await updateDoc(doc(db, COL_EINTRAEGE, e.id), { effStunden: wert === null ? deleteField() : wert });
-      } catch (err) {
-        console.error(err);
-        alert(`Stunden von ${e.name} konnten nicht gespeichert werden.`);
-        inp.value = e.effStunden ?? "";
-        return;
-      }
-      if (wert === null) delete e.effStunden; else e.effStunden = wert;
-      nachher(e, inp);
-    }));
   }
 
   let neuSchichtId = null;
@@ -1061,7 +1055,8 @@
       const bestE = eig.filter(x => x.e.status === "bestaetigt");
       const best = bestE.map(x => x.s);
       // einsaetze = alle (inkl. unbestätigt), bestaetigt = nur vom OK bestätigt (zählt für Anzahl/Stunden)
-      return { id, ...h, einsaetze: eig.map(x => x.s), alle: eig, bestaetigt: best, stunden: bestE.reduce((n, x) => n + stundenE(x.e, x.s), 0) };
+      const summe = bestE.reduce((n, x) => n + stundenE(x.e, x.s), 0);
+      return { id, ...h, einsaetze: eig.map(x => x.s), alle: eig, bestaetigt: best, stundenEinsaetze: summe, stunden: typeof h.stundenGesamt === "number" ? h.stundenGesamt : summe };
     }).sort((a, b) => `${a.name} ${a.vorname}`.localeCompare(`${b.name} ${b.vorname}`));
   }
   const verfText = v => (v || []).map(x => { const [t, z] = x.split("_"); return `${tagLabel(t).split(" ")[0].slice(0, 2)} ${z === "V" ? "Vorm." : "Nachm."}`; }).join(", ");
@@ -1083,6 +1078,12 @@
   const vereineVon = h => String(h?.verein || "").split(",").map(v => v.trim()).filter(Boolean);
   const fmtH = n => (Math.round(n * 10) / 10).toLocaleString("de-CH");
 
+  // Vom OK angepasste Gesamtstunden eines Helfers: Differenz zur Summe seiner gezählten Einsätze
+  function gesamtKorrektur(id, h, zaehlt) {
+    if (typeof h.stundenGesamt !== "number") return 0;
+    return h.stundenGesamt - eintraege.filter(e => e.helferId === id && zaehlt(e)).reduce((n, e) => { const s = schichten.find(x => x.id === e.schichtId); return n + (s ? stundenE(e, s) : 0); }, 0);
+  }
+
   function dashboardDaten(nurBest) {
     const proVerein = {};
     const add = (v, k, n) => { proVerein[v] = proVerein[v] || { helfer: 0, einsaetze: 0, stunden: 0 }; proVerein[v][k] += n; };
@@ -1091,6 +1092,11 @@
       const s = schichten.find(x => x.id === e.schichtId); if (!s) return;
       const vs = vereineVon(helfer[e.helferId]); const liste = vs.length ? vs : ["(ohne Angabe)"];
       liste.forEach(v => { add(v, "einsaetze", 1 / liste.length); add(v, "stunden", stundenE(e, s) / liste.length); });
+    });
+    Object.entries(helfer).forEach(([id, h]) => {
+      const d = gesamtKorrektur(id, h, e => !nurBest || e.status === "bestaetigt");
+      const vs = vereineVon(h); const liste = vs.length ? vs : ["(ohne Angabe)"];
+      if (d) liste.forEach(v => add(v, "stunden", d / liste.length));
     });
     return proVerein;
   }
@@ -1104,7 +1110,8 @@
     const nurBest = $("dashNurBest").checked;
     const zaehlt = e => !nurBest || e.status === "bestaetigt";
     const bedarfH = schichten.reduce((n, s) => n + s.bedarf * stundenVon(s), 0);
-    const besetztH = eintraege.filter(zaehlt).reduce((n, e) => { const s = schichten.find(x => x.id === e.schichtId); return n + (s ? stundenE(e, s) : 0); }, 0);
+    const besetztH = eintraege.filter(zaehlt).reduce((n, e) => { const s = schichten.find(x => x.id === e.schichtId); return n + (s ? stundenE(e, s) : 0); }, 0)
+      + Object.entries(helfer).reduce((n, [id, h]) => n + gesamtKorrektur(id, h, zaehlt), 0);
     const pv = dashboardDaten(nurBest);
     const vereine = Object.entries(pv).sort((a, b) => b[1].stunden - a[1].stunden);
     const maxH = Math.max(0, ...vereine.map(([, d]) => d.stunden));
@@ -1202,8 +1209,6 @@
   });
   const einsatzListe = h => h.alle.map(({ e, s }) => `${e.status === "bestaetigt" ? "✅" : "🟡"} ${esc(einsatzText(s))}`).join("<br>") || "<span class='muted'>–</span>";
 
-  const einsatzListeStunden = h => h.alle.map(({ e, s }) => `<div class="flex-row" style="flex-wrap:nowrap;margin-bottom:0.15rem;"><span>${e.status === "bestaetigt" ? "✅" : "🟡"} ${esc(einsatzText(s))}</span><span class="nowrap">${effHelferFeld(e, s)}</span></div>`).join("") || "<span class='muted'>–</span>";
-
   function renderAnmeldungen() {
     const z = gefiltert("an");
     $("anAnzahl").textContent = `${z.length} von ${Object.keys(helfer).length}`;
@@ -1227,20 +1232,32 @@
     $("hlAnzahl").textContent = `${z.length} von ${alle.length}`;
     $("adminHelfer").innerHTML = alle.length ? `<table>` +
       kopf("hl", [["vorname", "Vorname"], ["name", "Name"], ["tel", "Telefon"], ["mail", "E-Mail"], ["verein", "Verein"],
-        ["anzahl", "Anzahl ✅", "nur bestätigte"], ["stunden", "Stunden ✅", "nur bestätigte"], ["einsaetze", "Einsätze"],
+        ["anzahl", "Anzahl ✅", "nur bestätigte"], ["stunden", "Stunden ✅", "Summe der bestätigten Einsätze, hier für den Helfer anpassbar"], ["einsaetze", "Einsätze"],
         ["bemerkung", "Bemerkung"], [null, ""]]) +
       z.map(h => `<tr><td class="fix">${esc(h.vorname)}</td><td>${esc(h.name)}${doppelt(h) ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td>
         <td class="nowrap">${esc(h.tel)}</td><td class="klein">${esc(h.mail)}</td><td>${esc(h.verein)}</td>
         <td style="text-align:center;">${h.bestaetigt.length}</td>
-        <td style="text-align:right; white-space:nowrap;"><strong data-stunden>${fmtH(h.stunden)} h</strong></td>
-        <td class="klein" style="min-width:360px;">${einsatzListeStunden(h)}</td><td class="klein">${esc(h.bemerkung)}</td>
+        <td style="text-align:right; white-space:nowrap;"><input type="number" min="0" step="0.25" data-hstd="${h.id}" value="${typeof h.stundenGesamt === "number" ? h.stundenGesamt : ""}" placeholder="${h.stundenEinsaetze}" title="Gesamtstunden von ${esc(h.vorname)} ${esc(h.name)} (leer = Summe der Einsätze: ${fmtH(h.stundenEinsaetze)} h)" style="width:70px;font-size:0.85rem;padding:0.15rem;"/> h</td>
+        <td class="klein" style="min-width:260px;">${einsatzListe(h)}</td><td class="klein">${esc(h.bemerkung)}</td>
         <td><button class="small danger" data-hdel="${h.id}">Löschen</button></td></tr>`).join("") + "</table>" + (z.length ? "" : "<p class='muted'>Keine Treffer für diesen Filter.</p>")
       : "<p class='muted'>Noch keine Anmeldungen.</p>";
     bindeSortierung("hl", $("adminHelfer"), renderHelferTabelle);
-    bindeEffHelfer($("adminHelfer"), (e, inp) => {
-      inp.closest("tr").querySelector("[data-stunden]").textContent = `${fmtH(helferZeilen().find(h => h.id === e.helferId).stunden)} h`;
-      renderKpis(); renderUebersicht(); renderDashboard();
-    });
+    $("adminHelfer").querySelectorAll("[data-hstd]").forEach(inp => inp.addEventListener("change", async () => {
+      const id = inp.dataset.hstd, h = helfer[id];
+      const wert = inp.value.trim() === "" ? null : Number(inp.value);
+      if (wert !== null && !(wert >= 0)) { alert("Bitte eine Stundenzahl ab 0 eingeben."); inp.value = h.stundenGesamt ?? ""; return; }
+      try {
+        await updateDoc(doc(db, COL_HELFER, id), { stundenGesamt: wert === null ? deleteField() : wert });
+      } catch (err) {
+        console.error(err);
+        alert(`Stunden von ${h.vorname} ${h.name} konnten nicht gespeichert werden.`);
+        inp.value = h.stundenGesamt ?? "";
+        return;
+      }
+      if (wert === null) delete h.stundenGesamt; else h.stundenGesamt = wert;
+      // Liste nicht neu aufbauen, damit man mit Tab zum nächsten Helfer weiterfahren kann
+      renderDashboard();
+    }));
     $("adminHelfer").querySelectorAll("[data-hdel]").forEach(b => b.addEventListener("click", async () => {
       const h = helfer[b.dataset.hdel];
       if (!confirm(`${h.vorname} ${h.name} inkl. aller Einsätze löschen?`)) return;

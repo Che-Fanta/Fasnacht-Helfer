@@ -302,6 +302,13 @@
   <button id="nhAbbrechen" class="secondary">Abbrechen</button>
 </dialog>
 
+<dialog id="kontaktDialog" style="border:none; border-radius:6px; box-shadow:0 0 12px rgba(0,0,0,0.3); max-width:340px; width:92%;">
+  <h2 id="ktName"></h2>
+  <p class="muted" id="ktVerein"></p>
+  <p id="ktDaten"></p>
+  <button id="ktSchliessen" class="secondary">Schliessen</button>
+</dialog>
+
 <footer class="made-by noprint">
   <a href="https://webschmiede.ch" target="_blank" rel="noopener" title="Webschmiede – Websites für Vereine und KMU">
     <img src="webschmiede-icon.svg" alt="" /><span class="txt"><small>made by</small><strong><span>WEB</span>SCHMIEDE</strong></span>
@@ -1191,7 +1198,7 @@
   function kopf(pf, spalten) {
     const { key, dir } = sortierung[pf];
     return "<tr>" + spalten.map(([k, label, title]) => k
-      ? `<th data-sort="${k}"${k === "vorname" ? ' class="fix"' : ""}${title ? ` title="${title}"` : ""}>${label}${k === key ? (dir > 0 ? " ▲" : " ▼") : " <span class='muted'>↕</span>"}</th>`
+      ? `<th data-sort="${k}"${k === "vorname" || (pf === "hl" && k === "name") ? ' class="fix"' : ""}${title ? ` title="${title}"` : ""}>${label}${k === key ? (dir > 0 ? " ▲" : " ▼") : " <span class='muted'>↕</span>"}</th>`
       : `<th>${label}</th>`).join("") + "</tr>";
   }
   function bindeSortierung(pf, box, render) {
@@ -1224,6 +1231,16 @@
       : "<p class='muted'>Noch keine Anmeldungen.</p>";
     bindeSortierung("an", $("adminAnmeldungen"), renderAnmeldungen);
   }
+  function zeigeKontakt(h) {
+    $("ktName").textContent = `${h.vorname} ${h.name}`;
+    $("ktVerein").textContent = h.verein || "";
+    $("ktDaten").innerHTML = [
+      h.tel ? `<a href="tel:${esc(h.tel.replace(/[^\d+]/g, ""))}">${esc(h.tel)}</a>` : "<span class='muted'>keine Telefonnummer</span>",
+      h.mail ? `<a href="mailto:${esc(h.mail)}">${esc(h.mail)}</a>` : "<span class='muted'>keine E-Mail</span>",
+    ].join("<br>");
+    $("kontaktDialog").showModal();
+  }
+  $("ktSchliessen").addEventListener("click", () => $("kontaktDialog").close());
   function renderHelferTabelle() {
     fuelleTabellenFilter();
     const alle = helferZeilen();
@@ -1231,11 +1248,11 @@
     const doppelt = h => alle.filter(x => norm(x.vorname + " " + x.name) === norm(h.vorname + " " + h.name)).length > 1;
     $("hlAnzahl").textContent = `${z.length} von ${alle.length}`;
     $("adminHelfer").innerHTML = alle.length ? `<table>` +
-      kopf("hl", [["vorname", "Vorname"], ["name", "Name"], ["tel", "Telefon"], ["mail", "E-Mail"], ["verein", "Verein"],
+      kopf("hl", [["name", "Name"], ["verein", "Verein"],
         ["anzahl", "Anzahl ✅", "nur bestätigte"], ["stunden", "Stunden ✅", "Berechnet: Summe der bestätigten Einsätze"], ["manuell", "Stunden manuell", "Überschreibt die berechneten Stunden, leer = berechneter Wert zählt"], ["einsaetze", "Einsätze"],
         ["bemerkung", "Bemerkung"], [null, ""]]) +
-      z.map(h => `<tr><td class="fix">${esc(h.vorname)}</td><td>${esc(h.name)}${doppelt(h) ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td>
-        <td class="nowrap">${esc(h.tel)}</td><td class="klein">${esc(h.mail)}</td><td>${esc(h.verein)}</td>
+      z.map(h => `<tr><td class="fix nowrap">${esc(h.vorname)} ${esc(h.name)} <button class="small secondary" data-kontakt="${h.id}" title="Kontaktdaten anzeigen">☎</button>${doppelt(h) ? " <span class='error' title='Gleicher Name mehrfach angemeldet'>⚠ doppelt</span>" : ""}</td>
+        <td>${esc(h.verein)}</td>
         <td style="text-align:center;">${h.bestaetigt.length}</td>
         <td style="text-align:right; white-space:nowrap;"><strong>${fmtH(h.stundenEinsaetze)} h</strong></td>
         <td style="text-align:right; white-space:nowrap;"><input type="number" min="0" step="0.25" data-hstd="${h.id}" value="${typeof h.stundenGesamt === "number" ? h.stundenGesamt : ""}" title="Gesamtstunden von ${esc(h.vorname)} ${esc(h.name)} manuell festlegen (leer = berechnete ${fmtH(h.stundenEinsaetze)} h zählen)" style="width:70px;font-size:0.85rem;padding:0.15rem;"/> h</td>
@@ -1243,6 +1260,7 @@
         <td><button class="small danger" data-hdel="${h.id}">Löschen</button></td></tr>`).join("") + "</table>" + (z.length ? "" : "<p class='muted'>Keine Treffer für diesen Filter.</p>")
       : "<p class='muted'>Noch keine Anmeldungen.</p>";
     bindeSortierung("hl", $("adminHelfer"), renderHelferTabelle);
+    $("adminHelfer").querySelectorAll("[data-kontakt]").forEach(b => b.addEventListener("click", () => zeigeKontakt(helfer[b.dataset.kontakt])));
     $("adminHelfer").querySelectorAll("[data-hstd]").forEach(inp => inp.addEventListener("change", async () => {
       const id = inp.dataset.hstd, h = helfer[id];
       const wert = inp.value.trim() === "" ? null : Number(inp.value);

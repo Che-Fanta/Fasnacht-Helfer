@@ -573,7 +573,6 @@
         <span>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> <span class="zeit">(${esc(s.zeit)})</span><br>
         ${e.status === "bestaetigt" ? "<span class='ok'>✅ definitiv</span>" : "<span style='color:var(--gelb);font-weight:bold;'>🟡 noch nicht bestätigt</span>"}
         <span class="muted">· Verantwortlich: ${esc(s.verantwortlich)}</span></span>
-        ${e.status !== "bestaetigt" ? `<button class="small danger" data-abmelden="${e.id}">Abmelden</button>` : ""}
       </div>`).join("")
       : "<p class='muted'>Du hast im Moment keine Einsätze.</p>";
     $("meineListe").innerHTML += "<p><strong>➕ Weitere Einsätze:</strong> unten anhaken und dann «Ausgewählte Einsätze dazunehmen» klicken.</p>";

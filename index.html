@@ -664,7 +664,6 @@
         "<p class='muted'>Änderungen oder Abmeldungen bitte bei der verantwortlichen Person bzw. beim OK melden. Bist du verhindert, organisier bitte deinen Ersatz selber.</p>" +
         (anmeldungOffen ? `<p style="margin:0.6rem 0;"><button id="btnDazu">+ Weitere Einsätze dazunehmen</button></p><div id="dazuBox"></div>` : "")
       : "<p class='muted'>Keine Einsätze unter diesem Namen gefunden.</p>";
-    bindeAbmelden($("suchResultat"), () => $("btnSuchen").click());
     // Weitere Einsätze direkt hier unten auswählen (freie, selbst wählbare Einsätze, die die Person noch nicht hat)
     if (treffer.length && anmeldungOffen) $("btnDazu").addEventListener("click", () => {
       const person = treffer[0];

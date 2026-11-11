@@ -35,9 +35,8 @@ service cloud.firestore {
         && (istOK() || (request.resource.data.status == 'angemeldet'
             && anmeldungErlaubt(col.replace('_eintraege', ''), request.resource.data.schichtId)));
       allow update: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');
-      // Noch nicht bestätigte Einsätze darf jeder abmelden, bestätigte nur das OK
-      allow delete: if col.matches('Fasnacht_[0-9]+_eintraege')
-        && (istOK() || resource.data.status == 'angemeldet');
+      // Helfer können Einsätze nur einsehen, nicht ändern oder abmelden – löschen nur das OK
+      allow delete: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');
     }
     // Kontaktdaten: Helfer dürfen nur anlegen, lesen nur das OK
     match /{col}/{id} {

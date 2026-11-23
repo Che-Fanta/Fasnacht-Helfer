@@ -47,6 +47,10 @@
   .schicht { border-bottom: 1px solid #eee; padding: 0.5rem 0.2rem; display: flex; gap: 0.6rem; align-items: flex-start; }
   .schicht:last-child { border-bottom: none; }
   .schicht .info { flex: 1; }
+  /* Einsatz in der Helferansicht ist ein <label>: Label-Formular-Stil zurücksetzen */
+  #helferSchichten label.schicht { flex-direction: row; margin-top: 0; font-size: 1rem; font-weight: normal; color: inherit; cursor: pointer; }
+  #helferSchichten label.schicht:has(input:disabled) { cursor: default; }
+  #helferSchichten label.schicht:has(input:checked) { background: #fffbd6; }
   .schicht .zeit { color: #555; font-size: 0.85rem; }
   .namen { font-size: 0.85rem; color: #444; margin-top: 0.2rem; }
   .badge { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.8rem; font-weight: bold; color: white; white-space: nowrap; }
@@ -559,13 +563,27 @@
   async function ladeEintraege() {
     const snap = await getDocs(collection(db, COL_EINTRAEGE));
     eintraege = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    indexNeu();
   }
   async function ladeHelfer() {
     const snap = await getDocs(collection(db, COL_HELFER));
     helfer = {};
     snap.docs.forEach(d => helfer[d.id] = d.data());
   }
-  const eintraegeVon = sid => eintraege.filter(e => e.schichtId === sid);
+  // Einträge pro Einsatz / pro Helfer als Index (schnell auch bei Hunderten Helfern).
+  // Nach jeder Änderung an "eintraege" indexNeu() aufrufen (passiert in ladeEintraege und zu Beginn jedes Renderns).
+  let idxSchicht = null, idxHelfer = null;
+  function indexNeu() { idxSchicht = idxHelfer = null; }
+  function baueIndex() {
+    idxSchicht = new Map(); idxHelfer = new Map();
+    eintraege.forEach(e => {
+      (idxSchicht.get(e.schichtId) || idxSchicht.set(e.schichtId, []).get(e.schichtId)).push(e);
+      (idxHelfer.get(e.helferId) || idxHelfer.set(e.helferId, []).get(e.helferId)).push(e);
+    });
+  }
+  const eintraegeVon = sid => { if (!idxSchicht) baueIndex(); return idxSchicht.get(sid) || []; };
+  const eintraegeVonHelfer = hid => { if (!idxHelfer) baueIndex(); return idxHelfer.get(hid) || []; };
+  const schichtVon = sid => schichten.find(x => x.id === sid);
   function ampel(belegt, bedarf) {
     if (belegt >= bedarf) return "b-gruen";
     return belegt === 0 ? "b-rot" : "b-gelb";
@@ -611,6 +629,7 @@
   }
 
   function renderHelferSchichten() {
+    indexNeu();
     $("anmeldungZu").style.display = anmeldungOffen ? "none" : "block";
     $("formBox").style.display = anmeldungOffen && schichten.length ? "block" : "none";
     if (!schichten.length) { $("helferSchichten").innerHTML = "<p class='error'>Die Einsätze sind noch nicht freigeschaltet. Bitte schau später nochmals vorbei.</p>"; return; }
@@ -621,7 +640,8 @@
           const e = eintraegeVon(s.id);
           const voll = e.length >= s.bedarf;
           const nurOK = s.nurOK === true;
-          return `<div class="schicht"${nurOK ? ' style="opacity:0.75;"' : ""}>
+          // <label>: Antippen irgendwo auf dem Einsatz hakt ihn an (nicht nur das kleine Kästchen)
+          return `<label class="schicht"${nurOK ? ' style="opacity:0.75;"' : ""}>
             <input type="checkbox" data-sid="${s.id}" ${auswahl.has(s.id) ? "checked" : ""} ${voll || nurOK || !anmeldungOffen ? "disabled" : ""}/>
             <div class="info"><strong>${esc(s.aufgabe)}</strong>
               <div class="zeit">🕒 ${esc(s.zeit)} · Verantwortlich: ${esc(s.verantwortlich)}${s.hinweis ? " · " + esc(s.hinweis) : ""}</div>
@@ -629,7 +649,7 @@
             </div>
             ${nurOK && !voll ? `<span class="badge" style="background:#6c757d;">Einteilung durch OK</span>`
               : `<span class="badge ${ampel(e.length, s.bedarf)}">${voll ? "voll" : `${s.bedarf - e.length} frei`}</span>`}
-          </div>`;
+          </label>`;
         }).join("")).join("") + "</div></details>";
     }).join("");
     document.querySelectorAll("#helferSchichten input[data-sid]").forEach(cb => cb.addEventListener("change", () => {
@@ -676,28 +696,45 @@
   }
   $("btnNichtIch").addEventListener("click", () => { speichereIch(null); renderHelferSchichten(); $("formBox").scrollIntoView({ behavior: "smooth" }); });
 
-  async function pruefeFrei() {
-    await ladeEintraege();
-    const vollJetzt = [...auswahl].filter(sid => { const s = schichten.find(x => x.id === sid); return !s || s.nurOK || eintraegeVon(sid).length >= s.bedarf; });
-    vollJetzt.forEach(sid => auswahl.delete(sid));
-    return vollJetzt.length === 0;
+  // Vor dem Speichern Einsätze UND Einstellungen frisch laden (Seite kann lange offen gewesen sein).
+  // Gibt "" zurück, wenn alles frei ist, sonst die Meldung für die Person. Nicht mehr freie Einsätze werden abgewählt.
+  async function pruefeFrei(ids = [...auswahl]) {
+    await Promise.all([ladeConfig(), ladeEintraege()]);
+    if (!anmeldungOffen) { auswahl.clear(); return "Die Anmeldung wurde in der Zwischenzeit geschlossen. Bitte melde dich direkt beim OK."; }
+    const weg = ids.filter(sid => { const s = schichtVon(sid); return !s || s.nurOK || eintraegeVon(sid).length >= s.bedarf; });
+    weg.forEach(sid => auswahl.delete(sid));
+    return weg.length ? "Ein Einsatz wurde in der Zwischenzeit voll oder wird jetzt vom OK eingeteilt. Bitte Auswahl prüfen und nochmals absenden." : "";
+  }
+  const OFFLINE = "Keine Internetverbindung. Bitte Verbindung prüfen und nochmals versuchen.";
+  const fehlerText = err => err?.code === "unavailable" ? OFFLINE : "Speichern fehlgeschlagen. Bitte Seite neu laden und nochmals versuchen.";
+  // Speichern; dauert es lange (schlechter Empfang), Hinweis zeigen. Firestore sendet automatisch nach, sobald Verbindung da ist –
+  // darum bleibt der Knopf bis dahin gesperrt (sonst doppelte Anmeldungen).
+  async function speichere(batch, hinweis) {
+    const t = setTimeout(() => hinweis("Schlechte Verbindung – deine Anmeldung wird gesendet, sobald die Verbindung wieder da ist. Bitte Seite offen lassen."), 8000);
+    try { await batch.commit(); } finally { clearTimeout(t); }
   }
   async function einsaetzeDazunehmen() {
     if (!auswahl.size) return;
+    if (navigator.onLine === false) { alert(OFFLINE); return; }
     $("btnZumFormular").disabled = true;
     try {
-      if (!(await pruefeFrei())) { renderHelferSchichten(); alert("Ein Einsatz wurde in der Zwischenzeit voll. Bitte Auswahl prüfen."); return; }
+      const grund = await pruefeFrei();
+      if (grund) { renderHelferSchichten(); alert(grund); return; }
       const batch = writeBatch(db);
       [...auswahl].forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
         { schichtId: sid, helferId: ich.helferId, name: `${ich.vorname} ${ich.name}`, status: "angemeldet", erstellt: serverTimestamp() }));
-      await batch.commit();
+      await speichere(batch, t => $("stickyText").textContent = t);
       auswahl.clear();
       await ladeEintraege();
       renderHelferSchichten();
       $("meineBox").scrollIntoView({ behavior: "smooth" });
     } catch (err) {
       console.error(err);
-      alert("Speichern fehlgeschlagen. Bitte später nochmals versuchen.");
+      if (err?.code === "permission-denied") {
+        // Die Regeln verlangen, dass die Person existiert -> vom OK gelöscht: Gerät vergisst sie, Person meldet sich neu an
+        speichereIch(null); auswahl.clear(); renderHelferSchichten();
+        alert("Deine Anmeldung ist beim OK nicht mehr vorhanden. Bitte melde dich unten neu an.");
+      } else alert(fehlerText(err));
     } finally {
       $("btnZumFormular").disabled = false;
     }
@@ -710,12 +747,14 @@
     if (!vorname || !name || !tel) { st.className = "error"; st.textContent = "Bitte Vorname, Name und Telefon ausfüllen."; return; }
     if (!telOk(tel)) { st.className = "error"; st.textContent = "Bitte eine gültige Telefonnummer eingeben (z.B. 079 123 45 67)."; return; }
     if (!vereinWert("vereinBox")) { st.className = "error"; st.textContent = "Bitte Verein / Gruppe wählen (oder «Keine»)."; return; }
+    if (navigator.onLine === false) { st.className = "error"; st.textContent = OFFLINE; return; }
     $("btnSenden").disabled = true;
     st.className = "muted"; st.textContent = "Wird gespeichert…";
     try {
-      if (!(await pruefeFrei())) {
+      const grund = await pruefeFrei();
+      if (grund) {
         renderHelferSchichten();
-        st.className = "error"; st.textContent = "Ein Einsatz wurde in der Zwischenzeit voll. Bitte Auswahl prüfen und nochmals absenden.";
+        st.className = "error"; st.textContent = grund;
         return;
       }
       const verfuegbar = [...document.querySelectorAll("[data-verf]:checked")].map(c => c.dataset.verf);
@@ -727,7 +766,7 @@
         angemeldetFuer: [...auswahl].map(sid => einsatzText(schichten.find(x => x.id === sid))) });
       [...auswahl].forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
         { schichtId: sid, helferId: hRef.id, name: `${vorname} ${name}`, status: "angemeldet", erstellt: serverTimestamp() }));
-      await batch.commit();
+      await speichere(batch, t => { st.className = "error"; st.textContent = t; });
       // Auf diesem Gerät merken (nicht, wenn ein OK-Mitglied das Formular nutzt)
       if (!istAdmin) speichereIch({ helferId: hRef.id, vorname, name });
       const liste = [...auswahl].map(sid => { const s = schichten.find(x => x.id === sid); return `${tagLabel(s.tag)}: ${s.bereich} – ${s.aufgabe} (${s.zeit})`; });
@@ -742,7 +781,7 @@
         : `<strong>Merci vielmal, ${esc(vorname)}!</strong> Das OK meldet sich bei dir für einen Einsatz.`;
     } catch (err) {
       console.error(err);
-      st.className = "error"; st.textContent = "Speichern fehlgeschlagen. Bitte später nochmals versuchen.";
+      st.className = "error"; st.textContent = fehlerText(err);
     } finally {
       $("btnSenden").disabled = false;
     }
@@ -787,21 +826,22 @@
       $("btnDazuOk").addEventListener("click", async () => {
         const ids = [...$("dazuBox").querySelectorAll("[data-dazu]:checked")].map(c => c.dataset.dazu);
         if (!ids.length) { $("dazuStatus").className = "error"; $("dazuStatus").textContent = "Bitte mindestens einen Einsatz anhaken."; return; }
+        const zeige = t => { $("dazuStatus").className = "error"; $("dazuStatus").textContent = t; };
+        if (navigator.onLine === false) return zeige(OFFLINE);
         $("btnDazuOk").disabled = true;
         try {
-          await ladeEintraege();
-          const voll = ids.filter(sid => { const s = schichten.find(x => x.id === sid); return !s || eintraegeVon(sid).length >= s.bedarf; });
-          if (voll.length) { $("dazuStatus").className = "error"; $("dazuStatus").textContent = "Ein Einsatz wurde in der Zwischenzeit voll. Bitte nochmals wählen."; $("btnDazuOk").disabled = false; return; }
+          const grund = await pruefeFrei(ids);
+          if (grund) { zeige(grund); $("btnDazuOk").disabled = false; return; }
           const batch = writeBatch(db);
           ids.forEach(sid => batch.set(doc(collection(db, COL_EINTRAEGE)),
             { schichtId: sid, helferId: person.helferId, name: person.name, status: "angemeldet", erstellt: serverTimestamp() }));
-          await batch.commit();
+          await speichere(batch, zeige);
           await ladeEintraege();
           renderHelferSchichten();
           $("btnSuchen").click();   // Liste mit den neuen (🟡) Einsätzen neu anzeigen
         } catch (err) {
           console.error(err);
-          $("dazuStatus").className = "error"; $("dazuStatus").textContent = "Speichern fehlgeschlagen. Bitte später nochmals versuchen.";
+          zeige(err?.code === "permission-denied" ? "Diese Person ist beim OK nicht mehr vorhanden. Bitte oben neu anmelden." : fehlerText(err));
           $("btnDazuOk").disabled = false;
         }
       });
@@ -906,6 +946,7 @@
     $("adminContent").style.display = user ? "block" : "none";
     $("btnLogoutAdmin").style.display = user ? "inline-block" : "none";
     if (user) await ladeAdmin();
+    else $("globalError").textContent = "";   // "Kein Zugriff"-Meldung nach Logout entfernen
   }
   async function ladeAdmin() {
     try {
@@ -921,6 +962,7 @@
     renderAdmin();
   }
   function renderAdmin() {
+    indexNeu();
     renderKpis();
     renderUebersicht();
     renderHelferTabelle();
@@ -1032,17 +1074,22 @@
                   <span class="noprint">
                     <input type="number" min="0" step="0.25" data-act="effh" data-eid="${x.id}" value="${typeof x.effStunden === "number" ? x.effStunden : ""}" placeholder="${stundenIst(s)}" title="Effektive Stunden von ${esc(x.name)} (leer = Wert des Einsatzes)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h
                     ${x.status !== "bestaetigt" ? `<button class="small" data-act="ok" data-eid="${x.id}" title="bestätigen">✓</button>` : ""}
-                    <select class="small" data-act="move" data-eid="${x.id}" style="width:auto;max-width:200px;font-size:0.8rem;"><option value="">⇄ verschieben…</option>${schichtOptionen(s.id)}</select>
+                    <select class="small" data-act="move" data-eid="${x.id}" data-sid="${s.id}" style="width:auto;max-width:200px;font-size:0.8rem;"><option value="">⇄ verschieben…</option></select>
                     <button class="small danger" data-act="del" data-eid="${x.id}" title="entfernen">✕</button>
                   </span></div>`; }).join("")}
               <div class="noprint" style="margin-top:0.3rem;">
-                <select data-act="addsel" data-sid="${s.id}" style="width:auto;max-width:230px;font-size:0.85rem;"><option value="">+ bekannten Helfer einteilen…</option>${helferOptionen(s.id)}</select>
+                <select data-act="addsel" data-sid="${s.id}" style="width:auto;max-width:230px;font-size:0.85rem;"><option value="">+ bekannten Helfer einteilen…</option></select>
                 <button class="small secondary" data-act="addneu" data-sid="${s.id}">+ neue Person</button>
               </div>
             </div></div>`;
         }).join("")).join("") + "</div></details>").join("") || "<p class='muted'>Keine Einsätze für diesen Filter.</p>";
 
     const box = $("adminUebersicht");
+    // Auswahllisten erst beim Antippen füllen: vorab wären es bei 150 Helfern über 20'000 Einträge -> Seite sehr langsam
+    const fuelle = sel => { if (sel.dataset.voll) return; sel.dataset.voll = "1";
+      sel.insertAdjacentHTML("beforeend", sel.dataset.act === "move" ? schichtOptionen(sel.dataset.sid) : helferOptionen(sel.dataset.sid)); };
+    box.querySelectorAll("select[data-act=move], select[data-act=addsel]").forEach(sel =>
+      ["pointerdown", "touchstart", "focus", "keydown"].forEach(ev => sel.addEventListener(ev, () => fuelle(sel), { passive: true })));
     box.querySelectorAll("[data-act=ok]").forEach(b => b.addEventListener("click", () => setEintrag(b.dataset.eid, { status: "bestaetigt" })));
     box.querySelectorAll("[data-act=eff]").forEach(inp => inp.addEventListener("change", async () => {
       const sid = inp.dataset.sid, s = schichten.find(x => x.id === sid);
@@ -1144,7 +1191,7 @@
   // ---- Helferliste ----
   function helferZeilen() {
     return Object.entries(helfer).map(([id, h]) => {
-      const eig = eintraege.filter(e => e.helferId === id).map(e => ({ e, s: schichten.find(s => s.id === e.schichtId) })).filter(x => x.s);
+      const eig = eintraegeVonHelfer(id).map(e => ({ e, s: schichtVon(e.schichtId) })).filter(x => x.s);
       const bestE = eig.filter(x => x.e.status === "bestaetigt");
       const best = bestE.map(x => x.s);
       // einsaetze = alle (inkl. unbestätigt), bestaetigt = nur vom OK bestätigt (zählt für Anzahl/Stunden)
@@ -1331,7 +1378,9 @@
     fuelleTabellenFilter();
     const alle = helferZeilen();
     const z = gefiltert("hl");
-    const doppelt = h => alle.filter(x => norm(x.vorname + " " + x.name) === norm(h.vorname + " " + h.name)).length > 1;
+    const anzahlName = new Map();
+    alle.forEach(x => { const k = norm(x.vorname + " " + x.name); anzahlName.set(k, (anzahlName.get(k) || 0) + 1); });
+    const doppelt = h => anzahlName.get(norm(h.vorname + " " + h.name)) > 1;
     $("hlAnzahl").textContent = `${z.length} von ${alle.length}`;
     $("adminHelfer").innerHTML = alle.length ? `<table>` +
       kopf("hl", [["name", "Name"], ["verein", "Verein"],
@@ -1381,14 +1430,26 @@
     const wb = XLSX.utils.book_new();
     const status = e => e.status === "bestaetigt" ? "bestätigt" : "angemeldet";
     const kopf = ["Tag", "Bereich", "Aufgabe", "Zeit", "Verantwortlich", "Bedarf", "Eingeteilt", "Offen", "Helfer"];
-    const blatt = (name, rows, breiten) => {
+    // Blattnamen müssen eindeutig sein (max. 31 Zeichen, Gross/Klein egal). Feste Blätter sind reserviert,
+    // ein Bereich "Helfer" oder zwei lange, gleich beginnende Bereichsnamen bekommen " (2)" usw.
+    const FEST = ["Übersicht", "Vereine", "Helfer"];
+    const belegt = new Set(FEST.map(n => n.toLowerCase()));
+    const blattName = (name, fest) => {
+      const basis = String(name || "Bereich").replace(/[\\/?*\[\]:]/g, "").trim().slice(0, 31) || "Bereich";
+      if (fest) return basis;
+      let n = basis, i = 2;
+      while (belegt.has(n.toLowerCase())) n = `${basis.slice(0, 31 - ` (${i})`.length)} (${i++})`;
+      belegt.add(n.toLowerCase());
+      return n;
+    };
+    const blatt = (name, rows, breiten, fest = false) => {
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws["!cols"] = breiten.map(w => ({ wch: w }));
-      XLSX.utils.book_append_sheet(wb, ws, name.replace(/[\\/?*\[\]:]/g, "").slice(0, 31));
+      XLSX.utils.book_append_sheet(wb, ws, blattName(name, fest));
     };
     const zeile = s => { const e = eintraegeVon(s.id);
       return [tagLabel(s.tag), s.bereich, s.aufgabe, s.zeit, s.verantwortlich, s.bedarf, e.length, Math.max(0, s.bedarf - e.length), e.map(x => x.name).join(", ")]; };
-    blatt("Übersicht", [kopf, ...schichten.map(zeile)], [22, 16, 36, 24, 22, 8, 10, 7, 60]);
+    blatt("Übersicht", [kopf, ...schichten.map(zeile)], [22, 16, 36, 24, 22, 8, 10, 7, 60], true);
 
     [...new Set(schichten.map(s => s.bereich))].forEach(b => {
       const rows = [[`Fasnacht ${JAHR}`, "", b, "Einsatzplanung"], []];
@@ -1405,12 +1466,12 @@
 
     blatt("Vereine", [["Verein / Gruppe", "Helfer", "Einsätze", "Stunden"],
       ...Object.entries(dashboardDaten(false)).sort((a, b) => b[1].stunden - a[1].stunden)
-        .map(([v, d]) => [v, d.helfer, Math.round(d.einsaetze * 10) / 10, Math.round(d.stunden * 10) / 10])], [24, 10, 10, 10]);
+        .map(([v, d]) => [v, d.helfer, Math.round(d.einsaetze * 10) / 10, Math.round(d.stunden * 10) / 10])], [24, 10, 10, 10], true);
 
     blatt("Helfer", [["Vorname", "Name", "Telefon", "E-Mail", "Verein", "Anzahl Einsätze (bestätigt)", "Stunden berechnet (bestätigt)", "Stunden manuell", "Stunden gültig", "Einsätze", "Bemerkung"],
       ...helferZeilen().map(h => [h.vorname, h.name, h.tel, h.mail, h.verein, h.bestaetigt.length, h.stundenEinsaetze, h.stundenGesamt ?? "", h.stunden,
         h.einsaetze.map(einsatzText).join("\n"), h.bemerkung])],
-      [14, 16, 16, 26, 16, 10, 10, 9, 9, 60, 30]);
+      [14, 16, 16, 26, 16, 10, 10, 9, 9, 60, 30], true);
 
     XLSX.writeFile(wb, `Helferliste_Fasnacht_${JAHR}.xlsx`);
   }
@@ -1507,16 +1568,38 @@
   // ====================================================================
   // START
   // ====================================================================
-  $("btnHelfer").addEventListener("click", oeffneHelfer);
-  $("btnAdmin").addEventListener("click", () => { zeigeView("adminView"); if (istAdmin) ladeAdmin(); });
-  document.querySelectorAll(".btnBack").forEach(b => b.addEventListener("click", () => zeigeView("startView")));
+  // Navigation über die Adresse (#helfer, #ok), damit die Zurück-Taste von Handy/Browser in der App bleibt
+  const HASH = { helferView: "#helfer", adminView: "#ok", startView: "" };
+  function route() {
+    if (location.hash === "#helfer") oeffneHelfer();
+    else if (location.hash === "#ok") { zeigeView("adminView"); if (istAdmin) ladeAdmin(); }
+    else zeigeView("startView");
+  }
+  function gehe(view) {
+    history.pushState({ app: true }, "", HASH[view] || location.pathname + location.search);
+    route();
+  }
+  $("btnHelfer").addEventListener("click", () => gehe("helferView"));
+  $("btnAdmin").addEventListener("click", () => gehe("adminView"));
+  // "← Startseite": kam man per Klick in der App hierher, wie die Zurück-Taste; bei einem Direktlink zur Startseite wechseln
+  document.querySelectorAll(".btnBack").forEach(b => b.addEventListener("click", () => history.state?.app ? history.back() : gehe("startView")));
+  window.addEventListener("popstate", route);
+
+  // Enter-Taste: Formular absenden, einloggen, Konto erstellen, suchen
+  const enterKlickt = (ids, btn) => ids.forEach(i => $(i).addEventListener("keydown", ev => {
+    if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); $(btn).click(); } }));
+  enterKlickt(["fVorname", "fName", "fTel", "fMail"], "btnSenden");
+  enterKlickt(["adminMail", "adminPass"], "btnAdminLogin");
+  enterKlickt(["regMail", "regPass", "regPass2"], "btnRegistrieren");
+  enterKlickt(["suchName"], "btnSuchen");
+  enterKlickt(["nhVorname", "nhName", "nhTel", "nhMail"], "nhSpeichern");
 
   if (!konfiguriert) {
     $("globalError").textContent = "Firebase ist noch nicht eingerichtet (firebaseConfig in index.html ausfüllen).";
   } else {
     onAuthStateChanged(auth, onAdmin);
   }
-  zeigeView(location.hash === "#ok" ? "adminView" : "startView");
+  route();
 </script>
 </body>
 </html>

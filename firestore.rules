@@ -60,7 +60,10 @@ service cloud.firestore {
       allow read: if col.matches('Fasnacht_[0-9]+_eintraege');
       allow create: if col.matches('Fasnacht_[0-9]+_eintraege')
         && (istOK() || (gueltigerEintrag(request.resource.data) && request.resource.data.status == 'angemeldet'
-            && anmeldungErlaubt(col.replace('_eintraege', ''), request.resource.data.schichtId)));
+            && anmeldungErlaubt(col.replace('_eintraege', ''), request.resource.data.schichtId)
+            // Person muss existieren (auch im selben Batch neu angelegt) -> keine Einträge ohne Kontaktdaten,
+            // z.B. wenn das OK die Person gelöscht hat, das Handy sie aber noch kennt
+            && existsAfter(/databases/$(database)/documents/$(col.replace('_eintraege', '_helfer'))/$(request.resource.data.helferId))));
       allow update: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');
       // Helfer können Einsätze nur einsehen, nicht ändern oder abmelden – löschen nur das OK
       allow delete: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');

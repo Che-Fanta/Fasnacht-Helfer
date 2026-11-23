@@ -223,13 +223,13 @@
   </div>
   <div class="box" id="formBox">
     <h2>2. Deine Angaben</h2>
-    <label>Vorname *<input id="fVorname" autocomplete="given-name"/></label>
-    <label>Name *<input id="fName" autocomplete="family-name"/></label>
-    <label>Telefon (Handy) *<input id="fTel" type="tel" autocomplete="tel"/></label>
-    <label>E-Mail (optional)<input id="fMail" type="email" autocomplete="email"/></label>
+    <label>Vorname *<input id="fVorname" autocomplete="given-name" maxlength="60"/></label>
+    <label>Name *<input id="fName" autocomplete="family-name" maxlength="60"/></label>
+    <label>Telefon (Handy) *<input id="fTel" type="tel" autocomplete="tel" maxlength="30"/></label>
+    <label>E-Mail (optional)<input id="fMail" type="email" autocomplete="email" maxlength="120"/></label>
     <p style="margin:1rem 0 0.3rem; font-size:0.9rem; font-weight:bold; color:#444;">Verein / Gruppe * (mehrere möglich)</p>
     <div id="vereinBox" class="vereinBox"></div>
-    <label>Bemerkung (optional)<textarea id="fBemerkung" rows="2"></textarea></label>
+    <label>Bemerkung (optional)<textarea id="fBemerkung" rows="2" maxlength="1000"></textarea></label>
     <p class="muted">Deine Telefonnummer sieht nur das OK. Auf der Liste erscheint dein Name.</p>
     <button id="btnSenden" class="big">Anmeldung absenden</button>
     <p id="formStatus"></p>
@@ -534,6 +534,10 @@
   const TAG_FARBEN = ["#094B92", "#b02a37", "#198754", "#7b3fa0", "#c26a00", "#0f7c8c"];
   const tagFarbe = t => TAG_FARBEN[Math.max(0, tagIndex(t)) % TAG_FARBEN.length];
   const norm = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  // Telefon: nur Ziffern, Leerzeichen und + ( ) / . -, 9–15 Ziffern (Schweizer und ausländische Nummern)
+  const telOk = t => /^[\d\s+()\/.-]+$/.test(t) && t.replace(/\D/g, "").length >= 9 && t.replace(/\D/g, "").length <= 15;
+  // Namenssuche: alle eingegebenen Wörter müssen im Namen vorkommen, Reihenfolge egal ("Muster Anna" = "Anna Muster")
+  const nameTrifft = (name, q) => { const w = norm(name).split(" "); return norm(q).split(" ").every(x => w.includes(x)); };
 
   $("jahrHinweis").textContent = `Helfer-Einsätze Fasnacht ${JAHR}`;
 
@@ -637,7 +641,7 @@
   }
   function updateSticky() {
     $("sticky").style.display = auswahl.size ? "block" : "none";
-    $("stickyText").textContent = `${auswahl.size} Einsatz${auswahl.size === 1 ? "" : "e"} ausgewählt`;
+    $("stickyText").textContent = `${auswahl.size} ${auswahl.size === 1 ? "Einsatz" : "Einsätze"} ausgewählt`;
     $("btnZumFormular").textContent = ich ? "Ausgewählte Einsätze dazunehmen" : "Weiter zu meinen Angaben ↓";
   }
   $("btnZumFormular").addEventListener("click", () => ich ? einsaetzeDazunehmen() : $("formBox").scrollIntoView({ behavior: "smooth" }));
@@ -704,6 +708,7 @@
     const vorname = $("fVorname").value.trim(), name = $("fName").value.trim(), tel = $("fTel").value.trim();
     if (!auswahl.size) { st.className = "error"; st.textContent = "Bitte oben mindestens einen Einsatz anhaken."; return; }
     if (!vorname || !name || !tel) { st.className = "error"; st.textContent = "Bitte Vorname, Name und Telefon ausfüllen."; return; }
+    if (!telOk(tel)) { st.className = "error"; st.textContent = "Bitte eine gültige Telefonnummer eingeben (z.B. 079 123 45 67)."; return; }
     if (!vereinWert("vereinBox")) { st.className = "error"; st.textContent = "Bitte Verein / Gruppe wählen (oder «Keine»)."; return; }
     $("btnSenden").disabled = true;
     st.className = "muted"; st.textContent = "Wird gespeichert…";
@@ -747,18 +752,24 @@
     const q = norm($("suchName").value);
     if (!q) return;
     await ladeEintraege();
-    const treffer = eintraege.filter(e => norm(e.name) === q && schichten.some(s => s.id === e.schichtId))
+    const treffer = eintraege.filter(e => nameTrifft(e.name, q) && schichten.some(s => s.id === e.schichtId))
       .sort((a, b) => { const sa = schichten.find(s => s.id === a.schichtId), sb = schichten.find(s => s.id === b.schichtId);
         return tagIndex(sa.tag) - tagIndex(sb.tag) || (sa.sort ?? 0) - (sb.sort ?? 0); });
+    // Mehrere Personen gefunden (z.B. nur Vorname gesucht): getrennt anzeigen, Dazunehmen nur bei genau einer Person
+    const personen = [...new Set(treffer.map(e => e.helferId))];
+    const mehrere = personen.length > 1;
+    const einsatzZeile = e => { const s = schichten.find(x => x.id === e.schichtId);
+      return s ? `<div class="person" style="padding:0.5rem 0;"><span>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> (${esc(s.zeit)})<br>
+        ${e.status === "bestaetigt" ? "<span class='ok'>✅ definitiv</span>" : "<span style='color:var(--gelb);font-weight:bold;'>🟡 noch nicht bestätigt</span>"}</span></div>` : ""; };
     $("suchResultat").innerHTML = treffer.length
-      ? treffer.map(e => { const s = schichten.find(x => x.id === e.schichtId);
-          return s ? `<div class="person" style="padding:0.5rem 0;"><span>${esc(tagLabel(s.tag))}: <strong>${esc(s.bereich)} – ${esc(s.aufgabe)}</strong> (${esc(s.zeit)})<br>
-            ${e.status === "bestaetigt" ? "<span class='ok'>✅ definitiv</span>" : "<span style='color:var(--gelb);font-weight:bold;'>🟡 noch nicht bestätigt</span>"}</span></div>` : ""; }).join("") +
+      ? personen.map(hid => { const t = treffer.filter(e => e.helferId === hid);
+          return (mehrere ? `<h3>${esc(t[0].name)}</h3>` : "") + t.map(einsatzZeile).join(""); }).join("") +
         "<p class='muted'>Änderungen oder Abmeldungen bitte bei der verantwortlichen Person bzw. beim OK melden. Bist du verhindert, organisier bitte deinen Ersatz selber.</p>" +
-        (anmeldungOffen ? `<p style="margin:0.6rem 0;"><button id="btnDazu">+ Weitere Einsätze dazunehmen</button></p><div id="dazuBox"></div>` : "")
+        (anmeldungOffen && !mehrere ? `<p style="margin:0.6rem 0;"><button id="btnDazu">+ Weitere Einsätze dazunehmen</button></p><div id="dazuBox"></div>` : "") +
+        (anmeldungOffen && mehrere ? "<p class='muted'>Mehrere Personen gefunden. Um weitere Einsätze dazuzunehmen, bitte Vor- und Nachnamen eingeben.</p>" : "")
       : "<p class='muted'>Keine Einsätze unter diesem Namen gefunden.</p>";
     // Weitere Einsätze direkt hier unten auswählen (freie, selbst wählbare Einsätze, die die Person noch nicht hat)
-    if (treffer.length && anmeldungOffen) $("btnDazu").addEventListener("click", () => {
+    if (treffer.length && anmeldungOffen && !mehrere) $("btnDazu").addEventListener("click", () => {
       const person = treffer[0];
       const schon = new Set(treffer.map(e => e.schichtId));
       const frei = schichten.filter(s => !s.nurOK && !schon.has(s.id) && eintraegeVon(s.id).length < s.bedarf);
@@ -1093,6 +1104,7 @@
       mail: $("nhMail").value.trim(), verein: vereinWert("nhVereinBox"), verfuegbar: [],
       bemerkung: $("nhBemerkung").value.trim(), quelle: "ok", erstellt: serverTimestamp() };
     if (!h.vorname || !h.name || !h.tel) { $("nhStatus").textContent = "Bitte Vorname, Name und Telefon ausfüllen."; return; }
+    if (!telOk(h.tel)) { $("nhStatus").textContent = "Bitte eine gültige Telefonnummer eingeben (z.B. 079 123 45 67)."; return; }
     if (!h.verein) { $("nhStatus").textContent = "Bitte Verein / Gruppe wählen (oder «Keine»)."; return; }
     $("nhSpeichern").disabled = true;
     try {
@@ -1428,10 +1440,34 @@
       const sid = inp.closest("tr").dataset.row;
       // Checkbox "Selbstanmeldung" wird als nurOK (umgekehrt) gespeichert
       const f = inp.dataset.f === "offen" ? "nurOK" : inp.dataset.f;
-      const leer = f === "effStunden" && inp.value.trim() === "";
-      const wert = f === "nurOK" ? !inp.checked : (f === "bedarf" || f === "stunden" || f === "effStunden") ? Number(inp.value) : inp.value.trim();
-      await updateDoc(configRef, { [`schichten.${sid}.${f}`]: leer ? deleteField() : wert });
-      if (leer) delete schichten.find(s => s.id === sid)[f]; else schichten.find(s => s.id === sid)[f] = wert;
+      const s = schichten.find(x => x.id === sid);
+      // Leere Stunden = wieder aus der Zeitangabe schätzen
+      const leer = f === "stunden" && inp.value.trim() === "";
+      const zahl = f === "bedarf" || f === "stunden";
+      const wert = f === "nurOK" ? !inp.checked : zahl ? Number(inp.value) : inp.value.trim();
+      // Leerer/ungültiger Bedarf würde als 0 gespeichert (Einsatz gälte als voll) -> ablehnen und alten Wert zurück
+      if (zahl && !leer && (inp.value.trim() === "" || !(wert >= 0) || (f === "bedarf" && !Number.isInteger(wert)))) {
+        $("schichtStatus").className = "error";
+        $("schichtStatus").textContent = f === "bedarf" ? "Bedarf: bitte eine ganze Zahl ab 0 eingeben." : "Stunden: bitte eine Zahl ab 0 eingeben (leer = geschätzt).";
+        inp.value = f === "bedarf" ? s.bedarf : stundenVon(s);
+        return;
+      }
+      if ((f === "bereich" || f === "aufgabe") && !wert) {
+        $("schichtStatus").className = "error";
+        $("schichtStatus").textContent = "Bereich und Aufgabe dürfen nicht leer sein.";
+        inp.value = s[f];
+        return;
+      }
+      try {
+        await updateDoc(configRef, { [`schichten.${sid}.${f}`]: leer ? deleteField() : wert });
+      } catch (err) {
+        console.error(err);
+        $("schichtStatus").className = "error";
+        $("schichtStatus").textContent = "Speichern fehlgeschlagen. Bitte Verbindung prüfen und nochmals versuchen.";
+        return;
+      }
+      if (leer) { delete s[f]; inp.value = stundenVon(s); } else s[f] = wert;
+      $("schichtStatus").className = "ok";
       $("schichtStatus").textContent = "Gespeichert.";
       renderKpis(); renderUebersicht(); renderDashboard(); renderHelferTabelle();
     }));
@@ -1445,7 +1481,7 @@
   $("anmeldungOffen").addEventListener("change", async () => {
     anmeldungOffen = $("anmeldungOffen").checked;
     await setDoc(configRef, { anmeldungOffen }, { merge: true });
-    $("schichtStatus").textContent = anmeldungOffen ? "Anmeldung ist offen." : "Anmeldung ist geschlossen.";
+    $("schichtStatus").className = "ok"; $("schichtStatus").textContent = anmeldungOffen ? "Anmeldung ist offen." : "Anmeldung ist geschlossen.";
   });
   const neueId = () => "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
@@ -1461,10 +1497,10 @@
     const s = { tag: $("nTag").value, bereich: $("nBereich").value.trim(), aufgabe: $("nAufgabe").value.trim(),
       zeit: $("nZeit").value.trim(), bedarf: Number($("nBedarf").value) || 1, verantwortlich: $("nVerantw").value.trim(), hinweis: "",
       sort: Math.max(0, ...schichten.map(x => x.sort ?? 0)) + 10 };
-    if (!s.bereich || !s.aufgabe) { $("schichtStatus").textContent = "Bereich und Aufgabe ausfüllen."; return; }
+    if (!s.bereich || !s.aufgabe) { $("schichtStatus").className = "error"; $("schichtStatus").textContent = "Bereich und Aufgabe ausfüllen."; return; }
     await setDoc(configRef, { schichten: { [neueId()]: s } }, { merge: true });
     ["nBereich", "nAufgabe", "nZeit", "nVerantw"].forEach(i => $(i).value = "");
-    $("schichtStatus").textContent = "Einsatz hinzugefügt.";
+    $("schichtStatus").className = "ok"; $("schichtStatus").textContent = "Einsatz hinzugefügt.";
     await ladeAdmin();
   });
 

@@ -15,11 +15,39 @@ service cloud.firestore {
     match /Fasnacht_ok/zugang {
       allow read, write: if istOK();
     }
-    // Anmeldung global offen UND Einsatz nicht auf "nur OK" gestellt
+    // Einstellungen eines Jahres (Dokument muss existieren, sonst wird abgelehnt -> keine erfundenen Jahre)
+    function cfg(jahrCol) {
+      return get(/databases/$(database)/documents/$(jahrCol)/config).data;
+    }
+    function offen(jahrCol) {
+      return cfg(jahrCol).get('anmeldungOffen', true) == true;
+    }
+    // Anmeldung global offen UND Einsatz existiert UND ist nicht auf "nur OK" gestellt
     function anmeldungErlaubt(jahrCol, sid) {
-      let cfg = get(/databases/$(database)/documents/$(jahrCol)/config).data;
-      return cfg.get('anmeldungOffen', true) == true
-        && cfg.schichten.get(sid, {}).get('nurOK', false) == false;
+      let c = cfg(jahrCol);
+      return c.get('anmeldungOffen', true) == true
+        && sid in c.schichten
+        && c.schichten[sid].get('nurOK', false) == false;
+    }
+    function text(d, feld, min, max) {
+      return d[feld] is string && d[feld].size() >= min && d[feld].size() <= max;
+    }
+    function optText(d, feld, max) {
+      return !(feld in d) || (d[feld] is string && d[feld].size() <= max);
+    }
+    function optListe(d, feld, max) {
+      return !(feld in d) || (d[feld] is list && d[feld].size() <= max);
+    }
+    // Selbst-Anmeldung eines Helfers: nur bekannte Felder, Längen begrenzt
+    function gueltigerHelfer(d) {
+      return d.keys().hasOnly(['vorname', 'name', 'tel', 'mail', 'verein', 'verfuegbar', 'bemerkung', 'erstellt', 'angemeldetFuer'])
+        && text(d, 'vorname', 1, 60) && text(d, 'name', 1, 60) && text(d, 'tel', 6, 30)
+        && optText(d, 'mail', 120) && optText(d, 'verein', 200) && optText(d, 'bemerkung', 1000)
+        && optListe(d, 'verfuegbar', 10) && optListe(d, 'angemeldetFuer', 60);
+    }
+    function gueltigerEintrag(d) {
+      return d.keys().hasOnly(['schichtId', 'helferId', 'name', 'status', 'erstellt'])
+        && text(d, 'schichtId', 1, 40) && text(d, 'helferId', 1, 40) && text(d, 'name', 1, 125);
     }
 
     // Einsätze + Einstellungen
@@ -31,16 +59,16 @@ service cloud.firestore {
     match /{col}/{id} {
       allow read: if col.matches('Fasnacht_[0-9]+_eintraege');
       allow create: if col.matches('Fasnacht_[0-9]+_eintraege')
-        && request.resource.data.keys().hasOnly(['schichtId', 'helferId', 'name', 'status', 'erstellt'])
-        && (istOK() || (request.resource.data.status == 'angemeldet'
+        && (istOK() || (gueltigerEintrag(request.resource.data) && request.resource.data.status == 'angemeldet'
             && anmeldungErlaubt(col.replace('_eintraege', ''), request.resource.data.schichtId)));
       allow update: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');
       // Helfer können Einsätze nur einsehen, nicht ändern oder abmelden – löschen nur das OK
       allow delete: if istOK() && col.matches('Fasnacht_[0-9]+_eintraege');
     }
-    // Kontaktdaten: Helfer dürfen nur anlegen, lesen nur das OK
+    // Kontaktdaten: Helfer dürfen nur anlegen (bei offener Anmeldung), lesen nur das OK
     match /{col}/{id} {
-      allow create: if col.matches('Fasnacht_[0-9]+_helfer');
+      allow create: if col.matches('Fasnacht_[0-9]+_helfer')
+        && (istOK() || (gueltigerHelfer(request.resource.data) && offen(col.replace('_helfer', ''))));
       allow read, update, delete: if istOK() && col.matches('Fasnacht_[0-9]+_helfer');
     }
   }

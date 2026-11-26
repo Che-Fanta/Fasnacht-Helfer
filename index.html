@@ -1217,6 +1217,8 @@
   // Effektive Stunden: Wert des Helfers, sonst Wert des Einsatzes, sonst geplante Stunden
   const stundenIst = s => (typeof s.effStunden === "number" && s.effStunden >= 0) ? s.effStunden : stundenVon(s);
   const stundenE = (e, s) => (typeof e.effStunden === "number" && e.effStunden >= 0) ? e.effStunden : stundenIst(s);
+  // Summe der effektiven Stunden aller in diesem Einsatz eingetragenen Helfer
+  const effSumme = s => eintraegeVon(s.id).reduce((n, e) => n + stundenE(e, s), 0);
   const vereineVon = h => String(h?.verein || "").split(",").map(v => v.trim()).filter(Boolean);
   const fmtH = n => (Math.round(n * 10) / 10).toLocaleString("de-CH");
 

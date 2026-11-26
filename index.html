@@ -1111,6 +1111,8 @@
         return;
       }
       if (wert === null) delete e.effStunden; else e.effStunden = wert;
+      const sumEl = box.querySelector(`[data-effsum="${e.schichtId}"]`), sE = schichten.find(x => x.id === e.schichtId);
+      if (sumEl && sE) sumEl.textContent = `${fmtH(effSumme(sE))} h`;
       // Übersicht nicht neu aufbauen, damit man mit Tab zum nächsten Helfer weiterfahren kann
       renderKpis(); renderHelferTabelle(); renderDashboard();
     }));

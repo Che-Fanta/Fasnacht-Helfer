@@ -1067,7 +1067,7 @@
           const e = eintraegeVon(s.id);
           return `<div class="schicht"><div class="info">
               <div class="flex-row"><span><strong>${esc(s.aufgabe)}</strong> <span class="zeit">🕒 ${esc(s.zeit)}${s.hinweis ? " · " + esc(s.hinweis) : ""}${s.nurOK ? " · 🔒 nur OK-Einteilung" : ""}</span></span>
-              <span><span class="noprint muted">geplant <strong>${fmtH(stundenVon(s))} h</strong> · effektiv <input type="number" min="0" step="0.25" data-act="eff" data-sid="${s.id}" value="${stundenIst(s)}" title="Effektive Stunden für alle Helfer dieses Einsatzes ohne eigenen Wert (Standard = geplant ${fmtH(stundenVon(s))} h)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h</span>
+              <span><span class="noprint muted"><span title="Bedarf ${s.bedarf} × ${fmtH(stundenVon(s))} h">geplant <strong>${fmtH(s.bedarf * stundenVon(s))} h</strong></span> · <span title="Summe der effektiven Stunden aller eingetragenen Helfer">effektiv <strong data-effsum="${s.id}">${fmtH(effSumme(s))} h</strong></span> · pro Person <input type="number" min="0" step="0.25" data-act="eff" data-sid="${s.id}" value="${stundenIst(s)}" title="Effektive Stunden für alle Helfer dieses Einsatzes ohne eigenen Wert (Standard = geplant ${fmtH(stundenVon(s))} h)" style="width:65px;font-size:0.85rem;padding:0.15rem;"/> h</span>
               <span class="badge ${ampel(e.length, s.bedarf)}">${e.length} / ${s.bedarf}</span></span></div>
               ${e.map(x => { const h = helfer[x.helferId] || {};
                 return `<div class="person"><span>${x.status !== "bestaetigt" ? "<span class='neu'>🟡 neu</span> " : "✅ "}${esc(x.name)} <span class="muted">${esc(h.tel || "")}${h.verein ? " · " + esc(h.verein) : ""}</span></span>
